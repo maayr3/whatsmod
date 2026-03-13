@@ -1,0 +1,12 @@
+# Node environment
+node_modules/
+
+# Environment variables
+.env
+
+# whatsapp-web.js state
+.wwebjs_auth/
+.wwebjs_cache/
+
+# Local database
+database.json
