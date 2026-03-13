@@ -35,6 +35,9 @@ client.on('message_create', async (message) => {
     try {
         const chat = await message.getChat();
 
+        // Ignore bot's own moderation replies to prevent re-entrancy (double-post loop)
+        if ((message.body || '').startsWith('[mod]')) return;
+
         // As a Group Moderator Bot, we only care about groups.
         if (chat.isGroup) {
             const targetGroup = process.env.TARGET_GROUP;
