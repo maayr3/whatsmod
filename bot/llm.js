@@ -18,11 +18,37 @@ class LLMService {
      * @param {object} userStats       - Stats for all users (e.g., { "UserA": 2, ... })
      */
     async evaluate(messages, pendingImages = [], userStats = {}) {
-        const transcript = messages.join('\n');
+        // Find the index of the last moderation system marker
+        let lastMarkerIndex = -1;
+        for (let i = messages.length - 1; i >= 0; i--) {
+            if (messages[i].startsWith('[System]: Warned')) {
+                lastMarkerIndex = i;
+                break;
+            }
+        }
+
+        let priorContextStr = "";
+        let evaluateStr = "";
+
+        if (lastMarkerIndex >= 0) {
+            const priorContext = messages.slice(0, lastMarkerIndex + 1);
+            const toEvaluate = messages.slice(lastMarkerIndex + 1);
+            priorContextStr = `--- PRIOR CONTEXT (Already Moderated) ---\n${priorContext.join('\n\n')}\n-----------------------------------------`;
+            evaluateStr = `--- MESSAGES TO EVALUATE ---\n${toEvaluate.join('\n\n')}\n----------------------------`;
+        } else {
+            evaluateStr = `--- MESSAGES TO EVALUATE ---\n${messages.join('\n\n')}\n----------------------------`;
+        }
+
+        const transcript = lastMarkerIndex >= 0 ? `${priorContextStr}\n\n${evaluateStr}` : evaluateStr;
 
         const statsContext = Object.entries(userStats)
             .map(([u, c]) => `${u}: ${c} offense(s)`)
             .join(', ');
+
+        const debugLevel = parseInt(process.env.DEBUG_LEVEL || "0", 10);
+        const justificationGuidance = debugLevel >= 1
+            ? "Provide a detailed justification (2-5 sentences) for your decision."
+            : "Provide a brief justification (exactly 1 sentence) for your decision.";
 
         const systemPrompt = `
 ${this.rules}
@@ -33,14 +59,20 @@ ${statsContext || "No offenses logged for any user."}
 You are evaluating the recent transcript of a WhatsApp group chat.
 Return a STRICT JSON object in the exact format:
 {
-  "violation": boolean,           // true if there is a severe violation, toxicity, or off-topic message that needs warning/redirection
+  "violation": boolean,           // true if there is a severe violation, toxicity, or off topic message that needs warning/redirection
   "reason": "string",             // A brief internal reason for the action
+  "classification_analysis": "string", // ${justificationGuidance} This will be reviewed by an admin later.
   "action": "strike",             // The action to take, usually "strike"
   "target_user": "string",        // The precise name or number of the user who committed the violation or is being addressed
   "reply_message": "string"       // The human-like message to send in the chat regarding this warning, redirect, or response. Empty string if no violation or response needed.
 }
 
-If there is no violation, no explicit @mention, and the topic is NOT about Artificial General Intelligence (AGI), you MUST return violation=false and an empty reply_message. Do NOT provide "value-add" or helpful facts for general on-topic discussion. Stay silent unless action is required or you are directly engaged.
+### ANALYSIS INSTRUCTIONS:
+1. **URL Assessment:** If a message contains a URL (especially YouTube/social media), you MUST assess its content type based on the URL metadata or your knowledge of common creators. Determine if it is "High-Value" (educational/on-topic) or "Junk" (memes/random clips).
+2. **Contextual Analysis:** Evaluate media placeholders (e.g., [Media Attachment: video]) in the context of their captions and surrounding conversation.
+3. **Silence Policy:** If there is no violation, no explicit @mention, and the topic is NOT about Artificial General Intelligence (AGI), you MUST return violation=false and an empty reply_message. Still provide the "classification_analysis" for why no action was taken. Do NOT provide "value-add" or helpful facts for general on-topic discussion. Stay silent unless action is required or you are directly engaged.
+4. **Targeted Quoting and Moderation:** When issuing a warning or reply, you MUST identify the exact message within the "MESSAGES TO EVALUATE" section that caused the violation (do NOT evaluate messages in "PRIOR CONTEXT"). Quote that relevant message directly in your \`reply_message\` and tailor your response specifically to what that user said. Do not just blindly quote the most recent message if the violation happened earlier in the window.
+
 If a violation is detected or you are summoned/@-mentioned or discussing AGI, return the appropriate JSON.`;
 
         // Build the user message content. If there are new images, include them inline
@@ -50,18 +82,18 @@ If a violation is detected or you are summoned/@-mentioned or discussing AGI, re
         let userContent;
         if (pendingImages.length > 0) {
             userContent = [
-                { type: 'text', text: `Transcript:\n${transcript}\n\nThe following image(s) were just shared in the chat and require visual assessment:` }
+                { type: 'text', text: `Transcript: \n${transcript}\n\nThe following image(s) were just shared in the chat and require visual assessment: ` }
             ];
             for (const img of pendingImages) {
                 userContent.push({
                     type: 'image_url',
                     image_url: {
-                        url: `data:${img.mimeType};base64,${img.base64}`
+                        url: `data:${img.mimeType}; base64, ${img.base64} `
                     }
                 });
             }
         } else {
-            userContent = `Transcript:\n${transcript}`;
+            userContent = `Transcript: \n${transcript} `;
         }
 
         const fallbackCascade = [
@@ -85,10 +117,10 @@ If a violation is detected or you are summoned/@-mentioned or discussing AGI, re
                 const response = await this.openai.chat.completions.create(requestBody);
 
                 const elapsed = Date.now() - startTime;
-                console.log(`[API] ${currentModel} responded in ${elapsed}ms (request: ${(requestBytes / 1024).toFixed(1)}KB)`);
+                console.log(`[API] ${currentModel} responded in ${elapsed} ms(request: ${(requestBytes / 1024).toFixed(1)}KB)`);
 
                 let content = response.choices[0].message.content.trim();
-                content = content.replace(/^```[a-zA-Z]*\s*/, '').replace(/\s*```$/, '');
+                content = content.replace(/^```[a - zA - Z] *\s * /, '').replace(/\s * ```$/, '');
                 return JSON.parse(content);
             } catch (e) {
                 // Determine if it's a rate limit / quota / service error, or a missing model error (400, 404, 429, 503)
@@ -96,13 +128,13 @@ If a violation is detected or you are summoned/@-mentioned or discussing AGI, re
 
                 if (isTransientError && i < fallbackCascade.length - 1) {
                     if (e.status === 404) {
-                        console.error(`[API] Model ${currentModel} not found (404). Error: ${e.message}`);
+                        console.error(`[API] Model ${currentModel} not found(404).Error: ${e.message} `);
                     }
-                    console.warn(`[API] ${currentModel} returned ${e.status}. Error: ${e.message}\nBacking off to ${fallbackCascade[i + 1]}...`);
+                    console.warn(`[API] ${currentModel} returned ${e.status}.Error: ${e.message} \nBacking off to ${fallbackCascade[i + 1]}...`);
                     continue;
                 }
 
-                console.error(`[Fatal Error] Evaluation failed on ${currentModel} without recovery:`, e.status, e.message);
+                console.error(`[Fatal Error] Evaluation failed on ${currentModel} without recovery: `, e.status, e.message);
                 if (e.status === 429 || (e.message && e.message.includes('quota'))) {
                     return { error: 'QUOTA_EXHAUSTED' };
                 }

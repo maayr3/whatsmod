@@ -23,13 +23,13 @@ class Moderator {
                     if (media && media.data) {
                         // media.data is already base64-encoded
                         imageData = { mimeType: media.mimetype, base64: media.data };
-                        text = text || `[Image Attachment]`;
+                        text = text ? `${text} [Image Attachment]` : `[Image Attachment]`;
                     } else {
-                        text = text || `[Media Attachment: ${mediaType}]`;
+                        text = text ? `${text} [Media Attachment: ${mediaType}]` : `[Media Attachment: ${mediaType}]`;
                     }
                 } catch (e) {
                     console.warn(`[Media] Failed to download image: ${e.message}`);
-                    text = text || `[Media Attachment: ${mediaType}]`;
+                    text = text ? `${text} [Media Attachment: ${mediaType}]` : `[Media Attachment: ${mediaType}]`;
                 }
             } else if (mediaType === 'video') {
                 // Silently ignore videos larger than 10 MB
@@ -38,9 +38,9 @@ class Moderator {
                     console.log(`[Media] Ignoring video (${(fileSizeBytes / 1024 / 1024).toFixed(1)} MB > 10 MB limit)`);
                     return; // Silently drop, don't add to transcript or evaluate
                 }
-                text = text || `[Media Attachment: ${mediaType}]`;
+                text = text ? `${text} [Media Attachment: ${mediaType}]` : `[Media Attachment: ${mediaType}]`;
             } else {
-                text = text || `[Sticker/Media: ${mediaType}]`;
+                text = text ? `${text} [Sticker/Media: ${mediaType}]` : `[Sticker/Media: ${mediaType}]`;
             }
         }
 
@@ -146,6 +146,9 @@ class Moderator {
                     const fullReply = `[mod] ${replyMsg}`;
                     await message.reply(fullReply);
                     console.log(`[Bot Reply] (offense) to ${userKey}: ${fullReply}`);
+                    if (result.classification_analysis) {
+                        console.log(`[LLM Analysis] ${result.classification_analysis}`);
+                    }
 
                     // Inject system marker into context history to stop recursive firing
                     this.messageQueue.addSystemMarker(chatId, `Warned ${userKey} for ${result.reason}`);
@@ -158,12 +161,18 @@ class Moderator {
                     const fullReply = `[mod] ${result.reply_message}`;
                     await chat.sendMessage(fullReply);
                     console.log(`[Bot Reply] (info) to ${sender}: ${fullReply}`);
+                    if (result.classification_analysis) {
+                        console.log(`[LLM Analysis] ${result.classification_analysis}`);
+                    }
                     this.messageQueue.addSystemMarker(chatId, `Responded to ${sender} with helpful context.`);
                 } catch (e) {
                     console.error("Failed to send helpful reply:", e);
                 }
             } else {
                 console.log(`[LLM] Evaluated transcript cleanly. No action required.`);
+                if (result && result.classification_analysis) {
+                    console.log(`[LLM Analysis] ${result.classification_analysis}`);
+                }
             }
         });
     }

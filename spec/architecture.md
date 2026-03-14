@@ -43,4 +43,8 @@ To avoid overwhelming the LLM and the chat with API calls on every single messag
 ## 7. System Markers (Context Injection)
 When the bot issues a warning, it alters the active sliding window by injecting a system log:
 `[System]: Warned [User] for [Reason]`
-This is a critical architectural requirement. It prevents the LLM from repeatedly flagging the same offense when evaluating subsequent messages in the same 20-message transcript.
+This is a critical architectural requirement. It prevents the LLM from repeatedly flagging the same offense when evaluating subsequent messages in the same 20-message transcript. The prompt generation logic actively uses this marker to split the context into two blocks:
+1. **PRIOR CONTEXT (Already Moderated):** Messages before and including the most recent warning.
+2. **MESSAGES TO EVALUATE:** Any messages that have arrived since the last warning.
+
+The LLM is strictly instructed to only evaluate the "MESSAGES TO EVALUATE" block for new violations, solving infinite moderation loops.
