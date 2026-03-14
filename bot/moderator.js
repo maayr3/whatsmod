@@ -58,6 +58,7 @@ class Moderator {
         }
 
         const chatId = chat.id._serialized;
+        const messageId = message.id._serialized;
 
         if (text.toLowerCase() === '@bot stats' || text.toLowerCase() === 'stats') {
             const offenses = this.db.getOffenses(sender);
@@ -77,7 +78,7 @@ class Moderator {
         // Process message through sliding window queue
         // imageData is only non-null for brand-new images not yet in history.
         // pendingImages are drained after each evaluation, so they won't be re-uploaded.
-        this.messageQueue.addMessage(chatId, sender, text, imageData, async (transcript, pendingImages) => {
+        this.messageQueue.addMessage(chatId, sender, text, messageId, imageData, async (transcript, pendingImages) => {
             console.log(`Timer triggered: Evaluating ${transcript.length} messages for chat ${chatId}` +
                 (pendingImages.length ? ` (with ${pendingImages.length} new image(s))` : ''));
 

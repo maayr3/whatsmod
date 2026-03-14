@@ -1,0 +1,15 @@
+# AI Instructions for whatsmod
+
+## Automatic Commit and Push
+You MUST automatically commit and push your changes after completing every feature or task.
+Use the provided automation script:
+```bash
+bash scripts/auto_commit_push.sh "Commit message"
+```
+
+Alternatively, follow the `/complete-feature` workflow defined in `.agent/workflows/complete-feature.md`.
+
+## Workflow
+1. Complete the coding task.
+2. Verify the changes.
+3. Run the auto-commit script with a descriptive message.

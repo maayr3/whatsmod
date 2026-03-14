@@ -2,6 +2,9 @@ class MessageQueue {
     constructor() {
         // chat_id -> { messages: [], pendingImages: [], timer: null, isEvaluating: false }
         this.chats = {};
+        // Set of message IDs already added to avoid double-processing (e.g. from duplicate events)
+        this.processedIds = new Set();
+        this.maxProcessedIds = 100;
     }
 
     /**
@@ -9,10 +12,23 @@ class MessageQueue {
      * @param {string} chatId
      * @param {string} sender
      * @param {string} text        - The text representation (e.g. "[Media Attachment: image]")
+     * @param {string} messageId   - Unique ID of the message
      * @param {object|null} image  - Optional: { mimeType, base64 } for a NEW image not yet evaluated
      * @param {Function} callback  - Called with (messages, pendingImages) when the debounce fires
      */
-    addMessage(chatId, sender, text, image, callback) {
+    addMessage(chatId, sender, text, messageId, image, callback) {
+        if (this.processedIds.has(messageId)) {
+            console.log(`[Queue] Ignoring duplicate messageId: ${messageId}`);
+            return;
+        }
+
+        // Add to processed set and prune if necessary
+        this.processedIds.add(messageId);
+        if (this.processedIds.size > this.maxProcessedIds) {
+            const firstId = this.processedIds.values().next().value;
+            this.processedIds.delete(firstId);
+        }
+
         if (!this.chats[chatId]) {
             this.chats[chatId] = {
                 messages: [],
@@ -37,9 +53,7 @@ class MessageQueue {
             chatState.pendingImages.push({ sender, mimeType: image.mimeType, base64: image.base64 });
         }
 
-        // Fire immediately if there's no active timer/cooldown, otherwise debounce
-        const isFirstSinceEval = !chatState.timer;
-
+        // Debounce logic
         if (chatState.timer) {
             clearTimeout(chatState.timer);
         }
@@ -48,37 +62,28 @@ class MessageQueue {
             chatState.timer = null;
 
             if (chatState.isEvaluating) {
-                console.log(`[Queue] Evaluation already in-flight for ${chatId}, rescheduling...`);
-                chatState.timer = setTimeout(async () => {
-                    chatState.isEvaluating = true;
-                    try {
-                        const images = chatState.pendingImages.splice(0);
-                        await callback([...chatState.messages], images);
-                    } finally {
-                        chatState.isEvaluating = false;
-                    }
-                }, 3000);
+                // If already evaluating, wait another bit
+                console.log(`[Queue] Evaluation in-flight for ${chatId}, delaying...`);
+                chatState.timer = setTimeout(runEvaluation, 1000);
                 return;
             }
 
             chatState.isEvaluating = true;
             try {
+                // Capture current snapshot
+                const transcript = [...chatState.messages];
                 const images = chatState.pendingImages.splice(0);
-                await callback([...chatState.messages], images);
+
+                await callback(transcript, images);
+            } catch (err) {
+                console.error(`[Queue] Error in evaluation callback for ${chatId}:`, err);
             } finally {
                 chatState.isEvaluating = false;
             }
         };
 
-        if (isFirstSinceEval) {
-            // First message since last evaluation: run immediately, then set a cooldown
-            // so any follow-up messages within 3s get debounced instead of firing again.
-            runEvaluation();
-            chatState.timer = setTimeout(() => { chatState.timer = null; }, 3000);
-        } else {
-            // Subsequent message: reset debounce
-            chatState.timer = setTimeout(runEvaluation, 3000);
-        }
+        // Fire after a 3s quiet period
+        chatState.timer = setTimeout(runEvaluation, 3000);
     }
 
     addSystemMarker(chatId, markerText) {
