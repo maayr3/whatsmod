@@ -28,18 +28,25 @@ class Database {
         }
     }
 
-    addStrike(userId) {
+    addOffense(userId, contentType = 'unknown') {
         if (!this.data[userId]) {
-            this.data[userId] = { strikes: 0 };
+            this.data[userId] = { offenses: [] };
         }
-        this.data[userId].strikes += 1;
+        if (!this.data[userId].offenses) {
+            // Migrate legacy strike-only records
+            this.data[userId].offenses = [];
+        }
+        this.data[userId].offenses.push({
+            timestamp: new Date().toISOString(),
+            contentType
+        });
         this.save();
-        return this.data[userId].strikes;
+        return this.data[userId].offenses;
     }
 
-    getStats(userId) {
-        if (!this.data[userId]) return 0;
-        return this.data[userId].strikes || 0;
+    getOffenses(userId) {
+        if (!this.data[userId] || !this.data[userId].offenses) return [];
+        return this.data[userId].offenses;
     }
 
     setSystemState(key, value) {
@@ -53,6 +60,25 @@ class Database {
     getSystemState(key) {
         if (!this.data._system) return null;
         return this.data._system[key];
+    }
+
+    getAllUserStats(days = 30) {
+        const stats = {};
+        const now = Date.now();
+        const windowMs = days * 86400000;
+
+        for (const [userId, userData] of Object.entries(this.data)) {
+            if (userId === '_system') continue;
+            if (!userData.offenses) {
+                stats[userId] = 0;
+                continue;
+            }
+            const count = userData.offenses.filter(o =>
+                now - new Date(o.timestamp).getTime() < windowMs
+            ).length;
+            stats[userId] = count;
+        }
+        return stats;
     }
 }
 

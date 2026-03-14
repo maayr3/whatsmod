@@ -11,11 +11,24 @@ class LLMService {
         this.rules = fs.readFileSync(path.join(__dirname, '../rules.md'), 'utf-8');
     }
 
-    async evaluate(messages) {
+    /**
+     * Evaluate a transcript of recent messages.
+     * @param {string[]} messages      - Rolling window of text messages (last 20)
+     * @param {object[]} pendingImages - New images not yet seen by the LLM
+     * @param {object} userStats       - Stats for all users (e.g., { "UserA": 2, ... })
+     */
+    async evaluate(messages, pendingImages = [], userStats = {}) {
         const transcript = messages.join('\n');
+
+        const statsContext = Object.entries(userStats)
+            .map(([u, c]) => `${u}: ${c} offense(s)`)
+            .join(', ');
 
         const systemPrompt = `
 ${this.rules}
+
+USER PERFORMANCE STATS (Last 30 Days):
+${statsContext || "No offenses logged for any user."}
 
 You are evaluating the recent transcript of a WhatsApp group chat.
 Return a STRICT JSON object in the exact format:
@@ -27,34 +40,59 @@ Return a STRICT JSON object in the exact format:
   "reply_message": "string"       // The human-like message to send in the chat regarding this warning, redirect, or response. Empty string if no violation or response needed.
 }
 
-If no violation is detected but you wish to provide a helpful, data-backed value-add response to an on-topic question, you may set violation to false, populate target_user, and include your response in reply_message.
-If the discussion is fine and requires no intervention, return violation=false and an empty reply_message.`;
+If there is no violation, no explicit @mention, and the topic is NOT about Artificial General Intelligence (AGI), you MUST return violation=false and an empty reply_message. Do NOT provide "value-add" or helpful facts for general on-topic discussion. Stay silent unless action is required or you are directly engaged.
+If a violation is detected or you are summoned/@-mentioned or discussing AGI, return the appropriate JSON.`;
+
+        // Build the user message content. If there are new images, include them inline
+        // so the LLM can visually assess them. Images already processed (i.e. already in
+        // the 20-message history from a prior evaluation) are not re-uploaded — they remain
+        // as text placeholders in the transcript only.
+        let userContent;
+        if (pendingImages.length > 0) {
+            userContent = [
+                { type: 'text', text: `Transcript:\n${transcript}\n\nThe following image(s) were just shared in the chat and require visual assessment:` }
+            ];
+            for (const img of pendingImages) {
+                userContent.push({
+                    type: 'image_url',
+                    image_url: {
+                        url: `data:${img.mimeType};base64,${img.base64}`
+                    }
+                });
+            }
+        } else {
+            userContent = `Transcript:\n${transcript}`;
+        }
 
         const fallbackCascade = [
-            "qwen/qwen3.5-flash-02-23"
+            "google/gemini-3.1-flash-lite-preview"
         ];
 
         for (let i = 0; i < fallbackCascade.length; i++) {
             const currentModel = fallbackCascade[i];
             try {
-                const response = await this.openai.chat.completions.create({
+                const requestBody = {
                     model: currentModel,
                     response_format: { type: "json_object" },
                     messages: [
                         { role: "system", content: systemPrompt },
-                        { role: "user", content: `Transcript:\n${transcript}` }
-                    ],
-                    extra_body: {
-                        thinking: { type: "disabled" }
-                    }
-                });
+                        { role: "user", content: userContent }
+                    ]
+                };
+                const requestBytes = Buffer.byteLength(JSON.stringify(requestBody), 'utf8');
+                const startTime = Date.now();
+
+                const response = await this.openai.chat.completions.create(requestBody);
+
+                const elapsed = Date.now() - startTime;
+                console.log(`[API] ${currentModel} responded in ${elapsed}ms (request: ${(requestBytes / 1024).toFixed(1)}KB)`);
 
                 let content = response.choices[0].message.content.trim();
                 content = content.replace(/^```[a-zA-Z]*\s*/, '').replace(/\s*```$/, '');
                 return JSON.parse(content);
             } catch (e) {
                 // Determine if it's a rate limit / quota / service error, or a missing model error (400, 404, 429, 503)
-                const isTransientError = e.status === 429 || e.status >= 500 || e.status === 404 || e.status === 400 || (e.message && e.message.includes('quota'));
+                const isTransientError = e.status === 408 || e.status === 429 || e.status >= 500 || e.status === 404 || e.status === 400 || (e.message && e.message.includes('quota'));
 
                 if (isTransientError && i < fallbackCascade.length - 1) {
                     if (e.status === 404) {

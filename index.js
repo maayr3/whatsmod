@@ -1,4 +1,13 @@
 require('dotenv').config();
+
+// Prefix all console output with a timestamp
+['log', 'warn', 'error'].forEach(method => {
+    const orig = console[method].bind(console);
+    console[method] = (...args) => {
+        const ts = new Date().toTimeString().slice(0, 8);
+        orig(`[${ts}]`, ...args);
+    };
+});
 const { Client, LocalAuth } = require('whatsapp-web.js');
 const qrcode = require('qrcode-terminal');
 const Database = require('./bot/database');
