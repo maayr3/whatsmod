@@ -11,11 +11,7 @@ class LLMService {
     }
 
     /**
-     * Evaluate a transcript of recent messages.
-     * @param {string} channelName     - Name of the group/channel to load rules for
-     * @param {string[]} messages      - Rolling window of text messages (last 20)
-     * @param {object[]} pendingImages - New images not yet seen by the LLM
-     * @param {object} userStats       - Stats for all users (e.g., { "UserA": 2, ... })
+     * Evaluate a transcript of recent messages using a two-pass approach to eliminate bias.
      */
     async evaluate(channelName, messages, pendingImages = [], userStats = {}) {
         let channelRules = "";
@@ -34,8 +30,8 @@ class LLMService {
             }
         }
 
-        let priorContextStr = "";
         let evaluateStr = "";
+        let priorContextStr = "";
 
         if (lastMarkerIndex >= 0) {
             const priorContext = messages.slice(0, lastMarkerIndex + 1);
@@ -45,9 +41,41 @@ class LLMService {
         } else {
             evaluateStr = `--- MESSAGES TO EVALUATE ---\n${messages.join('\n\n')}\n----------------------------`;
         }
-
         const transcript = lastMarkerIndex >= 0 ? `${priorContextStr}\n\n${evaluateStr}` : evaluateStr;
 
+        const debugLevel = parseInt(process.env.DEBUG_LEVEL || "0", 10);
+        const justificationGuidance = debugLevel >= 1
+            ? "Provide a detailed justification (2-5 sentences) for your decision."
+            : "Provide a brief justification (exactly 1 sentence) for your decision.";
+
+        // --- PASS 1: Neutral Classification (No Stats) ---
+        const pass1SystemPrompt = `
+${channelRules}
+
+### MODERATION PRIORITY (NEUTRAL CLASSIFICATION):
+1. **CONTENT-FIRST EVALUATION:** You MUST judge each new message based ONLY on its intrinsic value. High-Value media (educational, tech/business news, tech reviews like CES updates, etc.) is STRICTLY PERMITTED.
+2. **UNCERTAINTY = SILENCE (MANDATORY):** If you cannot definitively verify that a link contains "Junk Media" (e.g. memes, unrelated comedy), you MUST return violation=false. Do NOT assume a link is junk just because it is from Instagram/TikTok and lacks a caption.
+3. **PRESUMPTION OF TOPICALITY:** Assume a link shared by a user is intended to be on-topic unless it is GLARINGLY obvious that it is junk (e.g. a meme format, a prank video, or unrelated comedy).
+
+Return a STRICT JSON object in the exact format:
+{
+  "violation": boolean,
+  "reason": "string",
+  "classification_analysis": "string" // ${justificationGuidance}
+}
+
+### ANALYSIS INSTRUCTIONS:
+- URL Assessment: Assess content type based on URL or creator (e.g. devdoesreviews is High-Value). 
+- **Silence Precedence:** If you are even 1% unsure if a link is high-value or junk, you MUST stay silent (violation: false).
+`;
+
+        const pass1Result = await this._callLLM(pass1SystemPrompt, transcript, pendingImages);
+
+        if (!pass1Result || !pass1Result.violation) {
+            return { violation: false, classification_analysis: pass1Result ? pass1Result.classification_analysis : "No action taken." };
+        }
+
+        // --- PASS 2: Response Tailoring (Include Stats) ---
         const statsContext = Object.entries(userStats)
             .map(([u, offenses]) => {
                 if (!offenses || offenses.length === 0) return `${u}: No offenses`;
@@ -56,101 +84,66 @@ class LLMService {
             })
             .join('\n\n');
 
-        const debugLevel = parseInt(process.env.DEBUG_LEVEL || "0", 10);
-        const justificationGuidance = debugLevel >= 1
-            ? "Provide a detailed justification (2-5 sentences) for your decision."
-            : "Provide a brief justification (exactly 1 sentence) for your decision.";
-
-        const systemPrompt = `
+        const pass2SystemPrompt = `
 ${channelRules}
 
-USER PERFORMANCE STATS (Last 30 Days):
+USER PERFORMANCE STATS:
 ${statsContext || "No offenses logged for any user."}
 
-You are evaluating the recent transcript of a WhatsApp group chat.
+The previous evaluation found a violation: "${pass1Result.reason}".
+Your task is to craft a human-like response and set the appropriate action.
+
 Return a STRICT JSON object in the exact format:
 {
-  "violation": boolean,           // true if there is a severe violation, toxicity, or off topic message that needs warning/redirection
-  "reason": "string",             // A brief internal reason for the action
-  "classification_analysis": "string", // ${justificationGuidance} This will be reviewed by an admin later.
-  "action": "strike",             // The action to take, usually "strike"
-  "target_user": "string",        // The precise name or number of the user who committed the violation or is being addressed
-  "reply_message": "string"       // The human-like message to send in the chat regarding this warning, redirect, or response. Empty string if no violation or response needed.
+  "violation": true,
+  "reason": "${pass1Result.reason}",
+  "classification_analysis": "${pass1Result.classification_analysis}",
+  "action": "strike",
+  "target_user": "string",
+  "reply_message": "string"
 }
 
-### ANALYSIS INSTRUCTIONS:
-1. **URL Assessment:** If a message contains a URL (especially YouTube/social media), you MUST assess its content type based on the URL metadata or your knowledge of common creators. Determine if it is "High-Value" (educational/on-topic) or "Junk" (memes/random clips).
-2. **Contextual Analysis:** Evaluate media placeholders (e.g., [Media Attachment: video]) in the context of their captions and surrounding conversation.
-3. **Direct Inquiries:** If a user asks about their own record, offenses, violations, or stats (e.g., "What are my violations?", "Show my record"), you MUST provide a helpful summary of the information found in the **USER PERFORMANCE STATS** section for that specific user. Do not give generic vague answers. Be precise and cite the timestamps and reasons provided.
-4. **Silence Policy:** If there is no violation, no explicit @mention, no direct inquiry about user stats/moderation, and the topic is NOT about Artificial General Intelligence (AGI), you MUST return violation=false and an empty reply_message. Still provide the "classification_analysis" for why no action was taken. Do NOT provide "value-add" or helpful facts for general on-topic discussion. Stay silent unless action is required, you are directly engaged, or answering a specific question about moderation/stats.
-5. **Targeted Quoting and Moderation:** When issuing a warning or reply, you MUST identify the exact message within the "MESSAGES TO EVALUATE" section that caused the violation (do NOT evaluate messages in "PRIOR CONTEXT"). Quote that relevant message directly in your \`reply_message\` and tailor your response specifically to what that user said. Do not just blindly quote the most recent message if the violation happened earlier in the window.
-6. **Self-Awareness:** Your own past messages are labeled with \`[AI_Moderator]\`. You MUST NOT flag your own past messages for moderation strikes, nor do you need to reply to your own messages. They are provided purely so you have context of what you have recently said.
+### RESPONSE INSTRUCTIONS:
+- Tone: Adjust severity based on USER PERFORMANCE STATS.
+- Consistency: Cite previous offenses naturally if applicable.
+- Brevity: Keep it human and concise.
+`;
 
-If a violation is detected or you are summoned/@-mentioned or discussing AGI, return the appropriate JSON.`;
+        return await this._callLLM(pass2SystemPrompt, transcript, pendingImages);
+    }
 
-        // Build the user message content. If there are new images, include them inline
-        // so the LLM can visually assess them. Images already processed (i.e. already in
-        // the 20-message history from a prior evaluation) are not re-uploaded — they remain
-        // as text placeholders in the transcript only.
+    async _callLLM(systemPrompt, transcript, pendingImages = []) {
         let userContent;
         if (pendingImages.length > 0) {
             userContent = [
-                { type: 'text', text: `Transcript: \n${transcript}\n\nThe following image(s) were just shared in the chat and require visual assessment: ` }
+                { type: 'text', text: `Transcript: \n${transcript}\n\nThe following image(s) require visual assessment: ` }
             ];
             for (const img of pendingImages) {
-                userContent.push({
-                    type: 'image_url',
-                    image_url: {
-                        url: `data:${img.mimeType}; base64, ${img.base64} `
-                    }
-                });
+                userContent.push({ type: 'image_url', image_url: { url: `data:${img.mimeType}; base64, ${img.base64} ` } });
             }
         } else {
             userContent = `Transcript: \n${transcript} `;
         }
 
-        const fallbackCascade = [
-            "google/gemini-3.1-flash-lite-preview"
-        ];
+        const fallbackCascade = ["google/gemini-3.1-flash-lite-preview"];
 
         for (let i = 0; i < fallbackCascade.length; i++) {
             const currentModel = fallbackCascade[i];
             try {
-                const requestBody = {
+                const response = await this.openai.chat.completions.create({
                     model: currentModel,
                     response_format: { type: "json_object" },
                     messages: [
                         { role: "system", content: systemPrompt },
                         { role: "user", content: userContent }
                     ]
-                };
-                const requestBytes = Buffer.byteLength(JSON.stringify(requestBody), 'utf8');
-                const startTime = Date.now();
-
-                const response = await this.openai.chat.completions.create(requestBody);
-
-                const elapsed = Date.now() - startTime;
-                console.log(`[API] ${currentModel} responded in ${elapsed} ms(request: ${(requestBytes / 1024).toFixed(1)}KB)`);
-
+                });
                 let content = response.choices[0].message.content.trim();
-                content = content.replace(/^```[a - zA - Z] *\s * /, '').replace(/\s * ```$/, '');
+                content = content.replace(/^```[a-zA-Z]*\s*/, '').replace(/\s*```$/, '');
                 return JSON.parse(content);
             } catch (e) {
-                // Determine if it's a rate limit / quota / service error, or a missing model error (400, 404, 429, 503)
-                const isTransientError = e.status === 408 || e.status === 429 || e.status >= 500 || e.status === 404 || e.status === 400 || (e.message && e.message.includes('quota'));
-
-                if (isTransientError && i < fallbackCascade.length - 1) {
-                    if (e.status === 404) {
-                        console.error(`[API] Model ${currentModel} not found(404).Error: ${e.message} `);
-                    }
-                    console.warn(`[API] ${currentModel} returned ${e.status}.Error: ${e.message} \nBacking off to ${fallbackCascade[i + 1]}...`);
-                    continue;
-                }
-
-                console.error(`[Fatal Error] Evaluation failed on ${currentModel} without recovery: `, e.status, e.message);
-                if (e.status === 429 || (e.message && e.message.includes('quota'))) {
-                    return { error: 'QUOTA_EXHAUSTED' };
-                }
+                if (i < fallbackCascade.length - 1) continue;
+                console.error(`[Fatal Error] LLM call failed: `, e.message);
                 return { violation: false };
             }
         }

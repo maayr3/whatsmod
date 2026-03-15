@@ -57,6 +57,24 @@ class Moderator {
             }
         }
 
+        // Handle quoted messages to provide context to the LLM
+        if (message.hasQuotedMsg) {
+            try {
+                const quotedMsg = await message.getQuotedMessage();
+                let quotedSender = "Unknown";
+                if (quotedMsg.fromMe) {
+                    quotedSender = "AI_Moderator";
+                } else {
+                    const quotedContact = await quotedMsg.getContact();
+                    quotedSender = quotedContact.pushname || quotedContact.number;
+                }
+                const quotedBody = quotedMsg.body || "[Media]";
+                text = `(Replying to ${quotedSender}: "${quotedBody}") ${text}`;
+            } catch (e) {
+                console.warn(`[Moderator] Failed to fetch quoted message: ${e.message}`);
+            }
+        }
+
         const chatId = chat.id._serialized;
         const messageId = message.id._serialized;
 
