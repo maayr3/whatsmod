@@ -60,6 +60,7 @@ ${channelRules}
 Return a STRICT JSON object in the exact format:
 {
   "violation": boolean,
+  "needs_reply": boolean, // Set to true if an @mention is detected or if rules require a helpful response
   "reason": "string",
   "classification_analysis": "string" // ${justificationGuidance}
 }
@@ -71,8 +72,11 @@ Return a STRICT JSON object in the exact format:
 
         const pass1Result = await this._callLLM(pass1SystemPrompt, transcript, pendingImages);
 
-        if (!pass1Result || !pass1Result.violation) {
-            return { violation: false, classification_analysis: pass1Result ? pass1Result.classification_analysis : "No action taken." };
+        if (!pass1Result || (!pass1Result.violation && !pass1Result.needs_reply)) {
+            return {
+                violation: false,
+                classification_analysis: pass1Result ? pass1Result.classification_analysis : "No action taken."
+            };
         }
 
         // --- PASS 2: Response Tailoring (Include Stats) ---
@@ -95,11 +99,11 @@ Your task is to craft a human-like response and set the appropriate action.
 
 Return a STRICT JSON object in the exact format:
 {
-  "violation": true,
-  "reason": "${pass1Result.reason}",
+  "violation": boolean, // Use the value from Pass 1
+  "reason": "${pass1Result.reason || "none"}",
   "classification_analysis": "${pass1Result.classification_analysis}",
-  "action": "strike",
-  "target_user": "string",
+  "action": "string", // "strike" for violations, "reply" for Q&A, "none" for silence
+  "target_user": "string", // The sender of the message being addressed
   "reply_message": "string"
 }
 

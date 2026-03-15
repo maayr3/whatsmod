@@ -1,6 +1,7 @@
 require('dotenv').config();
 const fs = require('fs');
 const path = require('path');
+const { execSync } = require('child_process');
 const logger = require('./bot/logger');
 const systemLogger = logger.system;
 const { Client, LocalAuth } = require('whatsapp-web.js');
@@ -8,6 +9,15 @@ const qrcode = require('qrcode-terminal');
 const Database = require('./bot/database');
 const MessageQueue = require('./bot/messageQueue');
 const Moderator = require('./bot/moderator');
+
+// Get version and commit hash
+const version = require('./package.json').version;
+let commitHash = 'unknown';
+try {
+    commitHash = execSync('git rev-parse --short HEAD').toString().trim();
+} catch (e) {
+    systemLogger.warn('Could not retrieve git commit hash');
+}
 
 // Initialize local database
 const db = new Database('./database.json');
@@ -57,5 +67,6 @@ client.on('message_create', async (message) => {
     }
 });
 
+systemLogger.log(`Starting WhatsMod v${version} (${commitHash})...`);
 systemLogger.log('Initializing WhatsApp Client...');
 client.initialize();

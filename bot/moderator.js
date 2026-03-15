@@ -1,4 +1,5 @@
 const LLMService = require('./llm');
+const TranscriptionService = require('./transcription');
 
 const VIDEO_SIZE_LIMIT_BYTES = 10 * 1024 * 1024; // 10 MB
 
@@ -7,6 +8,7 @@ class Moderator {
         this.db = db;
         this.messageQueue = messageQueue;
         this.llm = new LLMService();
+        this.transcription = new TranscriptionService();
     }
 
     async handleMessage(message, chat, logger) {
@@ -40,6 +42,23 @@ class Moderator {
                     return; // Silently drop, don't add to transcript or evaluate
                 }
                 text = text ? `${text} [Media Attachment: ${mediaType}]` : `[Media Attachment: ${mediaType}]`;
+            } else if (mediaType === 'audio' || mediaType === 'ptt') {
+                try {
+                    const media = await message.downloadMedia();
+                    if (media && media.data) {
+                        const transcribedText = await this.transcription.transcribe(media.data, media.mimetype, log);
+                        if (transcribedText) {
+                            text = text ? `${text} [Audio Transcription: "${transcribedText}"]` : `[Audio Transcription: "${transcribedText}"]`;
+                        } else {
+                            text = text ? `${text} [Media Attachment: ${mediaType}]` : `[Media Attachment: ${mediaType}]`;
+                        }
+                    } else {
+                        text = text ? `${text} [Media Attachment: ${mediaType}]` : `[Media Attachment: ${mediaType}]`;
+                    }
+                } catch (e) {
+                    log.warn(`[Media] Failed to transcribe audio: ${e.message}`);
+                    text = text ? `${text} [Media Attachment: ${mediaType}]` : `[Media Attachment: ${mediaType}]`;
+                }
             } else {
                 text = text ? `${text} [Sticker/Media: ${mediaType}]` : `[Sticker/Media: ${mediaType}]`;
             }
