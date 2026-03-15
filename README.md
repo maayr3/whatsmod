@@ -51,6 +51,15 @@ Scan the **QR Code** that appears in your terminal with your WhatsApp app (Setti
 
 ---
 
+## ☁️ Deployment
+
+Ready to move from your laptop to a server? Check out the [Deployment Guide](./DEPLOYMENT.md) for instructions on:
+- Managing secrets with `.env`.
+- Transferring session data to a VM.
+- Setting up a `systemd` service for 24/7 uptime.
+
+---
+
 ## 🛠️ Customizing Your Bot
 
 ### Edit the Rules
