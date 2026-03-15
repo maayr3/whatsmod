@@ -14,9 +14,10 @@ class MessageQueue {
      * @param {string} text        - The text representation (e.g. "[Media Attachment: image]")
      * @param {string} messageId   - Unique ID of the message
      * @param {object|null} image  - Optional: { mimeType, base64 } for a NEW image not yet evaluated
+     * @param {boolean} isFromBot  - Flag indicating if the message is from the bot itself
      * @param {Function} callback  - Called with (messages, pendingImages) when the debounce fires
      */
-    addMessage(chatId, sender, text, messageId, image, callback) {
+    addMessage(chatId, sender, text, messageId, image, isFromBot, callback) {
         if (this.processedIds.has(messageId)) {
             console.log(`[Queue] Ignoring duplicate messageId: ${messageId}`);
             return;
@@ -51,6 +52,12 @@ class MessageQueue {
         // If this message has image data, queue it for the next LLM evaluation
         if (image) {
             chatState.pendingImages.push({ sender, mimeType: image.mimeType, base64: image.base64 });
+        }
+
+        // If the message is from the bot itself, don't trigger the evaluation timer
+        if (isFromBot) {
+            console.log(`[Queue] Added AI_Moderator message to transcript but skipping evaluation trigger for ${chatId}`);
+            return;
         }
 
         // Debounce logic

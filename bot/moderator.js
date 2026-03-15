@@ -47,7 +47,7 @@ class Moderator {
         let sender = "";
 
         if (message.fromMe) {
-            sender = "Host_Account";
+            sender = "AI_Moderator";
         } else {
             try {
                 const contact = await message.getContact();
@@ -64,13 +64,13 @@ class Moderator {
             const offenses = this.db.getOffenses(sender);
             const total = offenses.length;
             if (total === 0) {
-                await message.reply(`[mod] Hey ${sender}, you have a clean record — no offenses logged.`);
+                await message.reply(`Hey ${sender}, you have a clean record — no offenses logged.`);
             } else {
                 const now = Date.now();
                 const inWindow = (ms) => offenses.filter(o => now - new Date(o.timestamp).getTime() < ms).length;
                 const today = inWindow(86400000);
                 const week = inWindow(7 * 86400000);
-                await message.reply(`[mod] Hey ${sender}, you have ${total} offense(s) on record (${today} today, ${week} this week).`);
+                await message.reply(`Hey ${sender}, you have ${total} offense(s) on record (${today} today, ${week} this week).`);
             }
             return;
         }
@@ -78,7 +78,7 @@ class Moderator {
         // Process message through sliding window queue
         // imageData is only non-null for brand-new images not yet in history.
         // pendingImages are drained after each evaluation, so they won't be re-uploaded.
-        this.messageQueue.addMessage(chatId, sender, text, messageId, imageData, async (transcript, pendingImages) => {
+        this.messageQueue.addMessage(chatId, sender, text, messageId, imageData, message.fromMe, async (transcript, pendingImages) => {
             console.log(`Timer triggered: Evaluating ${transcript.length} messages for chat ${chatId}` +
                 (pendingImages.length ? ` (with ${pendingImages.length} new image(s))` : ''));
 
@@ -99,7 +99,7 @@ class Moderator {
 
                 if (lastQuotaDate !== currentDate) {
                     try {
-                        const messageText = `[mod] Moderator disabled for today due to API limits. Will resume tomorrow.`;
+                        const messageText = `Moderator disabled for today due to API limits. Will resume tomorrow.`;
                         await chat.sendMessage(messageText);
                         this.db.setSystemState('lastQuotaWarningDate', currentDate);
                         console.log(`[Moderator] Sent quota exhaustion warning for ${currentDate}.`);
@@ -143,7 +143,7 @@ class Moderator {
                 const replyMsg = result.reply_message || `Warning: ${result.reason}.`;
 
                 try {
-                    const fullReply = `[mod] ${replyMsg}`;
+                    const fullReply = `${replyMsg}`;
                     await message.reply(fullReply);
                     console.log(`[Bot Reply] (offense) to ${userKey}: ${fullReply}`);
                     if (result.classification_analysis) {
@@ -158,7 +158,7 @@ class Moderator {
             } else if (result && !result.violation && result.reply_message) {
                 // Value-add response or polite redirection without strike
                 try {
-                    const fullReply = `[mod] ${result.reply_message}`;
+                    const fullReply = `${result.reply_message}`;
                     await chat.sendMessage(fullReply);
                     console.log(`[Bot Reply] (info) to ${sender}: ${fullReply}`);
                     if (result.classification_analysis) {
