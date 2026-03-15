@@ -83,7 +83,7 @@ class Moderator {
                 (pendingImages.length ? ` (with ${pendingImages.length} new image(s))` : ''));
 
             const userStats = this.db.getAllUserStats(30);
-            const result = await this.llm.evaluate(transcript, pendingImages, userStats);
+            const result = await this.llm.evaluate(chat.name, transcript, pendingImages, userStats);
 
             if (result && result.error === 'QUOTA_EXHAUSTED') {
                 // Gemini API resets at midnight Pacific Time

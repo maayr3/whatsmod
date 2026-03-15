@@ -8,16 +8,23 @@ class LLMService {
             baseURL: "https://openrouter.ai/api/v1",
             apiKey: process.env.OPENROUTER_API_KEY
         });
-        this.rules = fs.readFileSync(path.join(__dirname, '../rules.md'), 'utf-8');
     }
 
     /**
      * Evaluate a transcript of recent messages.
+     * @param {string} channelName     - Name of the group/channel to load rules for
      * @param {string[]} messages      - Rolling window of text messages (last 20)
      * @param {object[]} pendingImages - New images not yet seen by the LLM
      * @param {object} userStats       - Stats for all users (e.g., { "UserA": 2, ... })
      */
-    async evaluate(messages, pendingImages = [], userStats = {}) {
+    async evaluate(channelName, messages, pendingImages = [], userStats = {}) {
+        let channelRules = "";
+        try {
+            channelRules = fs.readFileSync(path.join(__dirname, '../rules', `${channelName}.md`), 'utf-8');
+        } catch (err) {
+            console.error(`[LLM] Could not load rules for channel ${channelName}: ${err.message}`);
+        }
+
         // Find the index of the last moderation system marker
         let lastMarkerIndex = -1;
         for (let i = messages.length - 1; i >= 0; i--) {
@@ -51,7 +58,7 @@ class LLMService {
             : "Provide a brief justification (exactly 1 sentence) for your decision.";
 
         const systemPrompt = `
-${this.rules}
+${channelRules}
 
 USER PERFORMANCE STATS (Last 30 Days):
 ${statsContext || "No offenses logged for any user."}

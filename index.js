@@ -1,5 +1,6 @@
 require('dotenv').config();
-
+const fs = require('fs');
+const path = require('path');
 // Prefix all console output with a timestamp
 ['log', 'warn', 'error'].forEach(method => {
     const orig = console[method].bind(console);
@@ -46,10 +47,10 @@ client.on('message_create', async (message) => {
 
         // As a Group Moderator Bot, we only care about groups.
         if (chat.isGroup) {
-            const targetGroup = process.env.TARGET_GROUP;
+            const ruleFilePath = path.join(__dirname, 'rules', `${chat.name}.md`);
 
-            // If TARGET_GROUP is defined in .env, restrict moderation to that specific group
-            if (targetGroup && chat.name !== targetGroup) {
+            // If a rules file exists for this group, evaluate it
+            if (!fs.existsSync(ruleFilePath)) {
                 return;
             }
 
