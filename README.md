@@ -40,7 +40,6 @@ You don't need to be a coder to get **whatsmod** running!
 3. Copy `.env.example` to `.env` and add your OpenAI API key:
    ```env
    OPENAI_API_KEY=your_key_here
-   TARGET_GROUP=Your Group Name
    ```
 
 ### 3. Launch

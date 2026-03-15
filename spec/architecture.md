@@ -9,7 +9,7 @@ The bot acts as an automated community moderator for WhatsApp groups. Its primar
 * **Authentication:** LocalAuth instance, which saves a session locally after an initial QR code scan via `qrcode-terminal`.
 * **LLM Routing:** OpenRouter via the OpenAI SDK compatibility layer.
 * **Rate-Limit Backoff:** Implements an automated cascading fallback to maximize quality and usability. If daily quotas or rate limits are hit (429/503/404), the system backs off down the `fallbackCascade` chain defined in `llm.js`.
-* **Group Whitelisting:** By specifying `TARGET_GROUP` inside the `.env` configuration, the bot will filter out and ignore all incoming events from any external or private group chats the host phone belongs to. It strictly reads/moderates the specified target group name.
+* **Group Whitelisting:** The bot will process messages in any group that has a corresponding rules file in the `rules/` directory (e.g., `rules/GroupName.md`). This allows for multi-channel support without hardcoding a single target group.
 
 ## 3. Core Logic & State Management (Bot Concurrency)
 To avoid overwhelming the LLM and the chat with API calls on every single message (especially during burst-typing):
