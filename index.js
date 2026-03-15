@@ -10,23 +10,43 @@ const Database = require('./bot/database');
 const MessageQueue = require('./bot/messageQueue');
 const Moderator = require('./bot/moderator');
 
-// Get version from git history
-let version = 'unknown';
-let commitHash = 'unknown';
-try {
-    // git describe --tags --always shows the latest tag, number of commits since then, and the hash
-    version = execSync('git describe --tags --always').toString().trim();
-    // Still get the short hash separately for clarity if needed, though version might contain it
-    commitHash = execSync('git rev-parse --short HEAD').toString().trim();
-} catch (e) {
-    // Fallback to package.json if git fails (e.g. in some environments)
+// Calculate semantic version from git history
+function calculateVersion() {
+    let major = 1;
+    let minor = 0;
+    let patch = 0;
+    let hash = 'unknown';
+
     try {
-        version = require('./package.json').version;
-        systemLogger.warn('Could not retrieve version from git describe, falling back to package.json');
-    } catch (err) {
-        systemLogger.error('Could not retrieve version information');
+        // Get short hash
+        hash = execSync('git rev-parse --short HEAD').toString().trim();
+
+        // Get all commit messages in chronological order
+        const log = execSync('git log --oneline --reverse').toString().trim().split('\n');
+
+        for (const line of log) {
+            const message = line.substring(8); // Skip the hash at the start of oneline log
+
+            if (message.includes('[FEATURE]') || message.includes('feat:')) {
+                minor++;
+                patch = 0;
+            } else if (message.includes('[FIX]') || message.includes('fix:') || /^[Ff]ix\s/.test(message)) {
+                patch++;
+            }
+        }
+    } catch (e) {
+        systemLogger.warn('Could not calculate version from git history, falling back to package.json');
+        try {
+            return { version: require('./package.json').version, hash: 'unknown' };
+        } catch (err) {
+            return { version: '1.0.0', hash: 'unknown' };
+        }
     }
+    return { version: `${major}.${minor}.${patch}`, hash };
 }
+
+const { version, hash } = calculateVersion();
+
 
 // Initialize local database
 const db = new Database('./database.json');
@@ -76,6 +96,6 @@ client.on('message_create', async (message) => {
     }
 });
 
-systemLogger.log(`Starting WhatsMod ${version} (${commitHash})...`);
+systemLogger.log(`Starting WhatsMod v${version} (${hash})...`);
 systemLogger.log('Initializing WhatsApp Client...');
 client.initialize();
