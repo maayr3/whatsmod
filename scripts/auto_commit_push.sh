@@ -1,7 +1,7 @@
 #!/bin/bash
 
 # This script automates git add, commit, and push.
-# Usage: ./scripts/auto_commit_push.sh "Commit message"
+# Usage: ./scripts/auto_commit_push.sh "feat: my commit message"
 
 if [ -z "$1" ]; then
   echo "Error: No commit message provided."
@@ -15,7 +15,7 @@ echo "Staging changes..."
 git add .
 
 echo "Committing changes with message: $MESSAGE"
-git commit -m "[FEATURE] $MESSAGE"
+git commit -m "$MESSAGE"
 
 echo "Pushing to origin main..."
 git push origin main

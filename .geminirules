@@ -2,14 +2,17 @@
 
 ## Automatic Commit and Push
 You MUST automatically commit and push your changes after completing every feature or task.
+Commits MUST follow the [Conventional Commits](https://www.conventionalcommits.org/en/v1.0.0/) standard:
+`<type>(<scope>): <description>`
+
+Common types: `feat`, `fix`, `docs`, `refactor`, `test`, `chore`.
+
 Use the provided automation script:
 ```bash
-bash scripts/auto_commit_push.sh "Commit message"
+bash scripts/auto_commit_push.sh "feat: add user login"
 ```
-
-Alternatively, follow the `/complete-feature` workflow defined in `.agent/workflows/complete-feature.md`.
 
 ## Workflow
 1. Complete the coding task.
 2. Verify the changes.
-3. Run the auto-commit script with a descriptive message.
+3. Run the auto-commit script with a conventional commit message.
