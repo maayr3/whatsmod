@@ -61,7 +61,7 @@ class Moderator {
         const messageId = message.id._serialized;
 
         if (text.toLowerCase() === '@bot stats' || text.toLowerCase() === 'stats') {
-            const offenses = this.db.getOffenses(sender);
+            const offenses = this.db.getOffenses(chat.name, sender);
             const total = offenses.length;
             if (total === 0) {
                 await message.reply(`Hey ${sender}, you have a clean record — no offenses logged.`);
@@ -70,7 +70,13 @@ class Moderator {
                 const inWindow = (ms) => offenses.filter(o => now - new Date(o.timestamp).getTime() < ms).length;
                 const today = inWindow(86400000);
                 const week = inWindow(7 * 86400000);
-                await message.reply(`Hey ${sender}, you have ${total} offense(s) on record (${today} today, ${week} this week).`);
+
+                let reply = `Hey ${sender}, you have ${total} offense(s) on record (${today} today, ${week} this week).`;
+                if (total > 0) {
+                    const recent = offenses.slice(-3).reverse();
+                    reply += `\n\nRecent violations:\n` + recent.map(o => `- [${new Date(o.timestamp).toLocaleDateString()}] ${o.contentType}`).join('\n');
+                }
+                await message.reply(reply);
             }
             return;
         }
@@ -82,7 +88,7 @@ class Moderator {
             console.log(`Timer triggered: Evaluating ${transcript.length} messages for chat ${chatId}` +
                 (pendingImages.length ? ` (with ${pendingImages.length} new image(s))` : ''));
 
-            const userStats = this.db.getAllUserStats(30);
+            const userStats = this.db.getAllUserStats(chat.name, 30);
             const result = await this.llm.evaluate(chat.name, transcript, pendingImages, userStats);
 
             if (result && result.error === 'QUOTA_EXHAUSTED') {
@@ -117,7 +123,7 @@ class Moderator {
                 const contentType = result.reason || 'unknown';
 
                 // Log timestamped offense
-                const offenses = this.db.addOffense(userKey, contentType);
+                const offenses = this.db.addOffense(chat.name, userKey, contentType);
 
                 // Build offense frequency context for the LLM reply (no hardcoded suffix)
                 const now = Date.now();

@@ -49,8 +49,12 @@ class LLMService {
         const transcript = lastMarkerIndex >= 0 ? `${priorContextStr}\n\n${evaluateStr}` : evaluateStr;
 
         const statsContext = Object.entries(userStats)
-            .map(([u, c]) => `${u}: ${c} offense(s)`)
-            .join(', ');
+            .map(([u, offenses]) => {
+                if (!offenses || offenses.length === 0) return `${u}: No offenses`;
+                const list = offenses.map(o => `- [${o.timestamp}] ${o.reason}`).join('\n');
+                return `${u} (${offenses.length} offense(s)):\n${list}`;
+            })
+            .join('\n\n');
 
         const debugLevel = parseInt(process.env.DEBUG_LEVEL || "0", 10);
         const justificationGuidance = debugLevel >= 1

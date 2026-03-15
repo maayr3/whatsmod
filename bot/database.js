@@ -11,11 +11,35 @@ class Database {
             try {
                 const rawData = fs.readFileSync(this.filePath);
                 this.data = JSON.parse(rawData);
+                this.migrate();
             } catch (e) {
                 console.error(`Error parsing ${this.filePath}, starting fresh.`, e);
                 this.data = {};
             }
         } else {
+            this.save();
+        }
+    }
+
+    migrate() {
+        // Migration: If we find top-level keys that aren't '_system' and have 'offenses',
+        // move them into 'WarRoom' (the default group).
+        const keys = Object.keys(this.data);
+        const legacyUsers = keys.filter(k => k !== '_system' && this.data[k].offenses);
+
+        if (legacyUsers.length > 0) {
+            console.log(`[Database] Migrating ${legacyUsers.length} users to 'WarRoom' namespace...`);
+            if (!this.data['WarRoom']) {
+                this.data['WarRoom'] = { users: {} };
+            }
+            if (!this.data['WarRoom'].users) {
+                this.data['WarRoom'].users = {};
+            }
+
+            for (const user of legacyUsers) {
+                this.data['WarRoom'].users[user] = this.data[user];
+                delete this.data[user];
+            }
             this.save();
         }
     }
@@ -28,25 +52,36 @@ class Database {
         }
     }
 
-    addOffense(userId, contentType = 'unknown') {
-        if (!this.data[userId]) {
-            this.data[userId] = { offenses: [] };
+    _ensureChannel(channelId) {
+        if (!this.data[channelId]) {
+            this.data[channelId] = { users: {} };
         }
-        if (!this.data[userId].offenses) {
-            // Migrate legacy strike-only records
-            this.data[userId].offenses = [];
+        if (!this.data[channelId].users) {
+            this.data[channelId].users = {};
         }
-        this.data[userId].offenses.push({
+    }
+
+    addOffense(channelId, userId, contentType = 'unknown') {
+        this._ensureChannel(channelId);
+        const users = this.data[channelId].users;
+
+        if (!users[userId]) {
+            users[userId] = { offenses: [] };
+        }
+        if (!users[userId].offenses) {
+            users[userId].offenses = [];
+        }
+        users[userId].offenses.push({
             timestamp: new Date().toISOString(),
             contentType
         });
         this.save();
-        return this.data[userId].offenses;
+        return users[userId].offenses;
     }
 
-    getOffenses(userId) {
-        if (!this.data[userId] || !this.data[userId].offenses) return [];
-        return this.data[userId].offenses;
+    getOffenses(channelId, userId) {
+        if (!this.data[channelId] || !this.data[channelId].users || !this.data[channelId].users[userId]) return [];
+        return this.data[channelId].users[userId].offenses || [];
     }
 
     setSystemState(key, value) {
@@ -62,21 +97,25 @@ class Database {
         return this.data._system[key];
     }
 
-    getAllUserStats(days = 30) {
+    getAllUserStats(channelId, days = 30) {
+        if (!this.data[channelId] || !this.data[channelId].users) return {};
+
         const stats = {};
         const now = Date.now();
         const windowMs = days * 86400000;
 
-        for (const [userId, userData] of Object.entries(this.data)) {
-            if (userId === '_system') continue;
+        for (const [userId, userData] of Object.entries(this.data[channelId].users)) {
             if (!userData.offenses) {
-                stats[userId] = 0;
+                stats[userId] = [];
                 continue;
             }
-            const count = userData.offenses.filter(o =>
+            const filtered = userData.offenses.filter(o =>
                 now - new Date(o.timestamp).getTime() < windowMs
-            ).length;
-            stats[userId] = count;
+            );
+            stats[userId] = filtered.map(o => ({
+                timestamp: o.timestamp,
+                reason: o.contentType
+            }));
         }
         return stats;
     }
