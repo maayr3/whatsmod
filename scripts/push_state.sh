@@ -1,9 +1,17 @@
 #!/bin/bash
 
-# Configuration - Update these with your VM details
-VM_USER="yourusername"
-VM_HOST="your.vm.ip.address"
-VM_PATH="/path/to/whatsmod" # E.g., /opt/whatsmod, /home/ubuntu/whatsmod
+# Usage: ./scripts/push_state.sh <vm_host> [vm_user] [vm_path]
+# Example: ./scripts/push_state.sh 192.168.1.100
+# Example: ./scripts/push_state.sh 192.168.1.100 matt /opt/whatsmod
+
+if [ -z "$1" ]; then
+    echo "Usage: $0 <vm_host> [vm_user] [vm_path]"
+    exit 1
+fi
+
+VM_HOST="$1"
+VM_USER="${2:-ubuntu}"
+VM_PATH="${3:-whatsmod}"
 
 echo "Pushing state to $VM_USER@$VM_HOST:$VM_PATH..."
 
