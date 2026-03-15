@@ -1,14 +1,8 @@
 require('dotenv').config();
 const fs = require('fs');
 const path = require('path');
-// Prefix all console output with a timestamp
-['log', 'warn', 'error'].forEach(method => {
-    const orig = console[method].bind(console);
-    console[method] = (...args) => {
-        const ts = new Date().toTimeString().slice(0, 8);
-        orig(`[${ts}]`, ...args);
-    };
-});
+const logger = require('./bot/logger');
+const systemLogger = logger.system;
 const { Client, LocalAuth } = require('whatsapp-web.js');
 const qrcode = require('qrcode-terminal');
 const Database = require('./bot/database');
@@ -31,13 +25,13 @@ const client = new Client({
 });
 
 client.on('qr', (qr) => {
-    console.log('Generating QR code...');
+    systemLogger.log('Generating QR code...');
     qrcode.generate(qr, { small: true });
-    console.log('Please scan the QR Code with your WhatsApp app.');
+    systemLogger.log('Please scan the QR Code with your WhatsApp app.');
 });
 
 client.on('ready', () => {
-    console.log('WhatsApp Bot Client is ready and connected!');
+    systemLogger.log('WhatsApp Bot Client is ready and connected!');
 });
 
 // Using 'message_create' event for receiving all new messages (including those sent by you)
@@ -54,13 +48,14 @@ client.on('message_create', async (message) => {
                 return;
             }
 
-            console.log(`[Group Match] Received message in "${chat.name}" from ${message.author || message.from}: "${message.body}"`);
-            await moderator.handleMessage(message, chat);
+            const channelLogger = new logger.ChannelLogger(chat.name);
+            channelLogger.log(`[Group Match] Received message from ${message.author || message.from}: "${message.body}"`);
+            await moderator.handleMessage(message, chat, channelLogger);
         }
     } catch (err) {
-        console.error('Error handling message:', err);
+        systemLogger.error('Error handling message:', err);
     }
 });
 
-console.log('Initializing WhatsApp Client...');
+systemLogger.log('Initializing WhatsApp Client...');
 client.initialize();

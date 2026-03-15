@@ -9,7 +9,8 @@ class Moderator {
         this.llm = new LLMService();
     }
 
-    async handleMessage(message, chat) {
+    async handleMessage(message, chat, logger) {
+        const log = logger || require('./logger').system;
         let text = message.body || "";
         let imageData = null; // { mimeType, base64 } for new images to send to LLM
 
@@ -28,14 +29,14 @@ class Moderator {
                         text = text ? `${text} [Media Attachment: ${mediaType}]` : `[Media Attachment: ${mediaType}]`;
                     }
                 } catch (e) {
-                    console.warn(`[Media] Failed to download image: ${e.message}`);
+                    log.warn(`[Media] Failed to download image: ${e.message}`);
                     text = text ? `${text} [Media Attachment: ${mediaType}]` : `[Media Attachment: ${mediaType}]`;
                 }
             } else if (mediaType === 'video') {
                 // Silently ignore videos larger than 10 MB
                 const fileSizeBytes = message.filesize || 0;
                 if (fileSizeBytes > VIDEO_SIZE_LIMIT_BYTES) {
-                    console.log(`[Media] Ignoring video (${(fileSizeBytes / 1024 / 1024).toFixed(1)} MB > 10 MB limit)`);
+                    log.log(`[Media] Ignoring video (${(fileSizeBytes / 1024 / 1024).toFixed(1)} MB > 10 MB limit)`);
                     return; // Silently drop, don't add to transcript or evaluate
                 }
                 text = text ? `${text} [Media Attachment: ${mediaType}]` : `[Media Attachment: ${mediaType}]`;
@@ -71,7 +72,7 @@ class Moderator {
                 const quotedBody = quotedMsg.body || "[Media]";
                 text = `(Replying to ${quotedSender}: "${quotedBody}") ${text}`;
             } catch (e) {
-                console.warn(`[Moderator] Failed to fetch quoted message: ${e.message}`);
+                log.warn(`[Moderator] Failed to fetch quoted message: ${e.message}`);
             }
         }
 
@@ -103,7 +104,7 @@ class Moderator {
         // imageData is only non-null for brand-new images not yet in history.
         // pendingImages are drained after each evaluation, so they won't be re-uploaded.
         this.messageQueue.addMessage(chatId, sender, text, messageId, imageData, message.fromMe, async (transcript, pendingImages) => {
-            console.log(`Timer triggered: Evaluating ${transcript.length} messages for chat ${chatId}` +
+            log.log(`Timer triggered: Evaluating ${transcript.length} messages` +
                 (pendingImages.length ? ` (with ${pendingImages.length} new image(s))` : ''));
 
             const userStats = this.db.getAllUserStats(chat.name, 30);
@@ -126,12 +127,12 @@ class Moderator {
                         const messageText = `Moderator disabled for today due to API limits. Will resume tomorrow.`;
                         await chat.sendMessage(messageText);
                         this.db.setSystemState('lastQuotaWarningDate', currentDate);
-                        console.log(`[Moderator] Sent quota exhaustion warning for ${currentDate}.`);
+                        log.log(`[Moderator] Sent quota exhaustion warning for ${currentDate}.`);
                     } catch (err) {
-                        console.error("Failed to send quota warning:", err);
+                        log.error("Failed to send quota warning:", err);
                     }
                 } else {
-                    console.log(`[Moderator] Quota exhausted, warning already sent for ${currentDate}.`);
+                    log.log(`[Moderator] Quota exhausted, warning already sent for ${currentDate}.`);
                 }
                 return;
             }
@@ -169,33 +170,33 @@ class Moderator {
                 try {
                     const fullReply = `${replyMsg}`;
                     await message.reply(fullReply);
-                    console.log(`[Bot Reply] (offense) to ${userKey}: ${fullReply}`);
+                    log.log(`[Bot Reply] (offense) to ${userKey}: ${fullReply}`);
                     if (result.classification_analysis) {
-                        console.log(`[LLM Analysis] ${result.classification_analysis}`);
+                        log.log(`[LLM Analysis] ${result.classification_analysis}`);
                     }
 
                     // Inject system marker into context history to stop recursive firing
                     this.messageQueue.addSystemMarker(chatId, `Warned ${userKey} for ${result.reason}`);
                 } catch (e) {
-                    console.error("Failed to send warning message:", e);
+                    log.error("Failed to send warning message:", e);
                 }
             } else if (result && !result.violation && result.reply_message) {
                 // Value-add response or polite redirection without strike
                 try {
                     const fullReply = `${result.reply_message}`;
                     await chat.sendMessage(fullReply);
-                    console.log(`[Bot Reply] (info) to ${sender}: ${fullReply}`);
+                    log.log(`[Bot Reply] (info) to ${sender}: ${fullReply}`);
                     if (result.classification_analysis) {
-                        console.log(`[LLM Analysis] ${result.classification_analysis}`);
+                        log.log(`[LLM Analysis] ${result.classification_analysis}`);
                     }
                     this.messageQueue.addSystemMarker(chatId, `Responded to ${sender} with helpful context.`);
                 } catch (e) {
-                    console.error("Failed to send helpful reply:", e);
+                    log.error("Failed to send helpful reply:", e);
                 }
             } else {
-                console.log(`[LLM] Evaluated transcript cleanly. No action required.`);
+                log.log(`[LLM] Evaluated transcript cleanly. No action required.`);
                 if (result && result.classification_analysis) {
-                    console.log(`[LLM Analysis] ${result.classification_analysis}`);
+                    log.log(`[LLM Analysis] ${result.classification_analysis}`);
                 }
             }
         });
