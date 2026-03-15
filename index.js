@@ -10,13 +10,22 @@ const Database = require('./bot/database');
 const MessageQueue = require('./bot/messageQueue');
 const Moderator = require('./bot/moderator');
 
-// Get version and commit hash
-const version = require('./package.json').version;
+// Get version from git history
+let version = 'unknown';
 let commitHash = 'unknown';
 try {
+    // git describe --tags --always shows the latest tag, number of commits since then, and the hash
+    version = execSync('git describe --tags --always').toString().trim();
+    // Still get the short hash separately for clarity if needed, though version might contain it
     commitHash = execSync('git rev-parse --short HEAD').toString().trim();
 } catch (e) {
-    systemLogger.warn('Could not retrieve git commit hash');
+    // Fallback to package.json if git fails (e.g. in some environments)
+    try {
+        version = require('./package.json').version;
+        systemLogger.warn('Could not retrieve version from git describe, falling back to package.json');
+    } catch (err) {
+        systemLogger.error('Could not retrieve version information');
+    }
 }
 
 // Initialize local database
@@ -67,6 +76,6 @@ client.on('message_create', async (message) => {
     }
 });
 
-systemLogger.log(`Starting WhatsMod v${version} (${commitHash})...`);
+systemLogger.log(`Starting WhatsMod ${version} (${commitHash})...`);
 systemLogger.log('Initializing WhatsApp Client...');
 client.initialize();
