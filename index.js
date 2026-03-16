@@ -47,7 +47,6 @@ function calculateVersion() {
 
 const { version, hash } = calculateVersion();
 
-
 // Initialize local database
 const db = new Database('./database.json');
 db.init();
@@ -60,6 +59,7 @@ const client = new Client({
     authStrategy: new LocalAuth(),
     puppeteer: {
         args: ['--no-sandbox', '--disable-setuid-sandbox'],
+        executablePath: process.env.CHROME_PATH || undefined,
     }
 });
 
@@ -69,8 +69,29 @@ client.on('qr', (qr) => {
     systemLogger.log('Please scan the QR Code with your WhatsApp app.');
 });
 
+client.on('authenticated', () => {
+    systemLogger.log('WhatsApp Bot authenticated successfully!');
+});
+
+client.on('auth_failure', (msg) => {
+    systemLogger.error('WhatsApp Bot authentication failure:', msg);
+});
+
 client.on('ready', () => {
     systemLogger.log('WhatsApp Bot Client is ready and connected!');
+});
+
+client.on('disconnected', (reason) => {
+    systemLogger.warn('WhatsApp Bot was disconnected:', reason);
+    // Exit with error code to let systemd restart the service
+    systemLogger.log('Restarting bot in 5 seconds...');
+    setTimeout(() => {
+        process.exit(1);
+    }, 5000);
+});
+
+client.on('change_state', (state) => {
+    systemLogger.log('WhatsApp Bot state changed:', state);
 });
 
 // Using 'message_create' event for receiving all new messages (including those sent by you)
@@ -97,6 +118,12 @@ client.on('message_create', async (message) => {
     }
 });
 
+// Hourly heartbeat to logs
+setInterval(() => {
+    systemLogger.log(`Heartbeat: WhatsMod v${version} (${hash}) is active. Memory usage: ${Math.round(process.memoryUsage().heapUsed / 1024 / 1024)}MB`);
+}, 60 * 60 * 1000);
+
 systemLogger.log(`Starting WhatsMod v${version} (${hash})...`);
 systemLogger.log('Initializing WhatsApp Client...');
 client.initialize();
+
