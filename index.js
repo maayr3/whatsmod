@@ -97,10 +97,13 @@ client.on('change_state', (state) => {
 // Using 'message_create' event for receiving all new messages (including those sent by you)
 client.on('message_create', async (message) => {
     try {
+        // Log EVERY message received for debugging
+        systemLogger.log(`[DEBUG] message_create event for message from ${message.from}`);
+
         const chat = await message.getChat();
 
-        // Log EVERY message received for debugging
-        systemLogger.log(`[DEBUG] message_create event for message from ${message.from} in chat ${chat.name} (isGroup: ${chat.isGroup})`);
+        systemLogger.log(`[DEBUG] Chat resolved: ${chat.name} (isGroup: ${chat.isGroup})`);
+
 
         // As a Group Moderator Bot, we only care about groups.
         if (chat.isGroup) {
