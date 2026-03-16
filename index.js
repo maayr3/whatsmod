@@ -99,6 +99,9 @@ client.on('message_create', async (message) => {
     try {
         const chat = await message.getChat();
 
+        // Log EVERY message received for debugging
+        systemLogger.log(`[DEBUG] message_create event for message from ${message.from} in chat ${chat.name} (isGroup: ${chat.isGroup})`);
+
         // As a Group Moderator Bot, we only care about groups.
         if (chat.isGroup) {
             const ruleFilePath = path.join(__dirname, 'rules', `${chat.name}.md`);
@@ -106,6 +109,7 @@ client.on('message_create', async (message) => {
 
             // If a rules file exists for this group, evaluate it
             if (!fs.existsSync(ruleFilePath) && !fs.existsSync(globalRulePath)) {
+                systemLogger.log(`[DEBUG] No rules found for group ${chat.name}. Skipping.`);
                 return;
             }
 
@@ -117,6 +121,7 @@ client.on('message_create', async (message) => {
         systemLogger.error('Error handling message:', err);
     }
 });
+
 
 // Hourly heartbeat to logs
 setInterval(() => {
