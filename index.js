@@ -27,10 +27,10 @@ function calculateVersion() {
         for (const line of log) {
             const message = line.substring(8); // Skip the hash at the start of oneline log
 
-            if (message.includes('[FEATURE]') || message.includes('feat:')) {
+            if (message.includes('[FEATURE]') || /^feat(\(.*\))?:/.test(message)) {
                 minor++;
                 patch = 0;
-            } else if (message.includes('[FIX]') || message.includes('fix:') || /^[Ff]ix\s/.test(message)) {
+            } else if (message.includes('[FIX]') || /^fix(\(.*\))?:/.test(message) || /^[Ff]ix\s/.test(message)) {
                 patch++;
             }
         }
