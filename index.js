@@ -81,9 +81,10 @@ client.on('message_create', async (message) => {
         // As a Group Moderator Bot, we only care about groups.
         if (chat.isGroup) {
             const ruleFilePath = path.join(__dirname, 'rules', `${chat.name}.md`);
+            const globalRulePath = path.join(__dirname, 'rules', 'global_rules.md');
 
             // If a rules file exists for this group, evaluate it
-            if (!fs.existsSync(ruleFilePath)) {
+            if (!fs.existsSync(ruleFilePath) && !fs.existsSync(globalRulePath)) {
                 return;
             }
 

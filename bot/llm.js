@@ -15,11 +15,20 @@ class LLMService {
      */
     async evaluate(channelName, messages, pendingImages = [], userStats = {}) {
         let channelRules = "";
+        let globalRules = "";
+        try {
+            globalRules = fs.readFileSync(path.join(__dirname, '../rules', 'global_rules.md'), 'utf-8');
+        } catch (err) {
+            // Optional: global rules might not exist
+        }
+
         try {
             channelRules = fs.readFileSync(path.join(__dirname, '../rules', `${channelName}.md`), 'utf-8');
         } catch (err) {
             console.error(`[LLM] Could not load rules for channel ${channelName}: ${err.message}`);
         }
+
+        const combinedRules = `${globalRules}\n\n${channelRules}`;
 
         // Find the index of the last moderation system marker
         let lastMarkerIndex = -1;
@@ -50,7 +59,7 @@ class LLMService {
 
         // --- PASS 1: Neutral Classification (No Stats) ---
         const pass1SystemPrompt = `
-${channelRules}
+${combinedRules}
 
 ### MODERATION PRIORITY (NEUTRAL CLASSIFICATION):
 1. **CONTENT-FIRST EVALUATION:** You MUST judge each new message based ONLY on its intrinsic value. High-Value media (educational, tech/business news, tech reviews like CES updates, etc.) is STRICTLY PERMITTED.
@@ -89,7 +98,7 @@ Return a STRICT JSON object in the exact format:
             .join('\n\n');
 
         const pass2SystemPrompt = `
-${channelRules}
+${combinedRules}
 
 USER PERFORMANCE STATS:
 ${statsContext || "No offenses logged for any user."}
