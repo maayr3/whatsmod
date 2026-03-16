@@ -77,9 +77,24 @@ client.on('auth_failure', (msg) => {
     systemLogger.error('WhatsApp Bot authentication failure:', msg);
 });
 
-client.on('ready', () => {
+client.on('ready', async () => {
     systemLogger.log('WhatsApp Bot Client is ready and connected!');
+
+    // Log all groups the bot is in
+    try {
+        const chats = await client.getChats();
+        const groups = chats.filter(chat => chat.isGroup);
+        systemLogger.log(`Bot is in ${groups.length} groups.`);
+        groups.forEach(group => {
+            const ruleFilePath = path.join(__dirname, 'rules', `${group.name}.md`);
+            const exists = fs.existsSync(ruleFilePath);
+            systemLogger.log(`- Group: "${group.name}" | Rules exists: ${exists} | ID: ${group.id._serialized}`);
+        });
+    } catch (err) {
+        systemLogger.error('Error listing groups on ready:', err);
+    }
 });
+
 
 client.on('disconnected', (reason) => {
     systemLogger.warn('WhatsApp Bot was disconnected:', reason);
