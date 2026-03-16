@@ -90,10 +90,18 @@ client.on('ready', async () => {
             const exists = fs.existsSync(ruleFilePath);
             systemLogger.log(`- Group: "${group.name}" | Rules exists: ${exists} | ID: ${group.id._serialized}`);
         });
+
+        // Test sending a message to WarRoom or Priority Ayre Mail
+        const priorityChat = groups.find(g => g.name === 'Priority Ayre Mail');
+        if (priorityChat) {
+            await priorityChat.sendMessage('WhatsMod is back online and monitoring this channel. (v' + version + ')');
+            systemLogger.log('Sent startup message to Priority Ayre Mail');
+        }
     } catch (err) {
         systemLogger.error('Error listing groups on ready:', err);
     }
 });
+
 
 
 client.on('disconnected', (reason) => {
