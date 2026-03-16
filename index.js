@@ -90,13 +90,6 @@ client.on('ready', async () => {
             const exists = fs.existsSync(ruleFilePath);
             systemLogger.log(`- Group: "${group.name}" | Rules exists: ${exists} | ID: ${group.id._serialized}`);
         });
-
-        // Test sending a message to WarRoom or Priority Ayre Mail
-        const priorityChat = groups.find(g => g.name === 'Priority Ayre Mail');
-        if (priorityChat) {
-            await priorityChat.sendMessage('WhatsMod is back online and monitoring this channel. (v' + version + ')');
-            systemLogger.log('Sent startup message to Priority Ayre Mail');
-        }
     } catch (err) {
         systemLogger.error('Error listing groups on ready:', err);
     }
@@ -120,12 +113,7 @@ client.on('change_state', (state) => {
 // Using 'message_create' event for receiving all new messages (including those sent by you)
 client.on('message_create', async (message) => {
     try {
-        // Log EVERY message received for debugging
-        systemLogger.log(`[DEBUG] message_create event for message from ${message.from}`);
-
         const chat = await message.getChat();
-
-        systemLogger.log(`[DEBUG] Chat resolved: ${chat.name} (isGroup: ${chat.isGroup})`);
 
 
         // As a Group Moderator Bot, we only care about groups.
@@ -135,7 +123,6 @@ client.on('message_create', async (message) => {
 
             // If a rules file exists for this group, evaluate it
             if (!fs.existsSync(ruleFilePath) && !fs.existsSync(globalRulePath)) {
-                systemLogger.log(`[DEBUG] No rules found for group ${chat.name}. Skipping.`);
                 return;
             }
 
