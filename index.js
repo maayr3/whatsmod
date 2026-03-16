@@ -90,10 +90,18 @@ client.on('ready', async () => {
             const exists = fs.existsSync(ruleFilePath);
             systemLogger.log(`- Group: "${group.name}" | Rules exists: ${exists} | ID: ${group.id._serialized}`);
         });
+
+        // Notify DEBUG channel that the bot is back online
+        const debugChat = groups.find(g => g.name === 'DEBUG');
+        if (debugChat) {
+            await debugChat.sendMessage(`WhatsMod v${version} (${hash}) is back online.`);
+            systemLogger.log('Sent startup notification to DEBUG channel.');
+        }
     } catch (err) {
         systemLogger.error('Error listing groups on ready:', err);
     }
 });
+
 
 
 
