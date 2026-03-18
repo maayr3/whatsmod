@@ -33,7 +33,7 @@ class LLMService {
         // Find the index of the last moderation system marker
         let lastMarkerIndex = -1;
         for (let i = messages.length - 1; i >= 0; i--) {
-            if (messages[i].startsWith('[System]: Warned')) {
+            if (messages[i].startsWith('[System]: Warned') || messages[i].startsWith('[System]: Responded')) {
                 lastMarkerIndex = i;
                 break;
             }
@@ -69,7 +69,7 @@ ${combinedRules}
 Return a STRICT JSON object in the exact format:
 {
   "violation": boolean,
-  "needs_reply": boolean, // Set to true ONLY if an @mention is detected OR users explicitly ask the moderator for help. Do NOT set to true for small talk or debugging. For everything else, this MUST BE FALSE unless evaluating a violation.
+  "needs_reply": boolean, // Set to true IF: 1) An UNANSWERED @mention is in the newest messages, 2) Users explicitly ask for help, OR 3) You were recently engaged in the PRIOR CONTEXT and a user is clearly continuing that direct conversation with you in the newest messages. DO NOT set to true for casual banter among humans.
   "reason": "string",
   "classification_analysis": "string" // ${justificationGuidance}
 }
