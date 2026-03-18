@@ -69,7 +69,7 @@ ${combinedRules}
 Return a STRICT JSON object in the exact format:
 {
   "violation": boolean,
-  "needs_reply": boolean, // Set to true if an @mention is detected or if rules require a helpful response
+  "needs_reply": boolean, // Set to true ONLY if an @mention is detected OR users explicitly ask the moderator for help. Do NOT set to true for small talk or debugging. For everything else, this MUST BE FALSE unless evaluating a violation.
   "reason": "string",
   "classification_analysis": "string" // ${justificationGuidance}
 }
@@ -103,7 +103,7 @@ ${combinedRules}
 USER PERFORMANCE STATS:
 ${statsContext || "No offenses logged for any user."}
 
-The previous evaluation found a violation: "${pass1Result.reason}".
+The previous evaluation yielded the following context/reason: "${pass1Result.reason}".
 Your task is to craft a human-like response and set the appropriate action.
 
 Return a STRICT JSON object in the exact format:
@@ -113,13 +113,14 @@ Return a STRICT JSON object in the exact format:
   "classification_analysis": "${pass1Result.classification_analysis}",
   "action": "string", // "strike" for violations, "reply" for Q&A, "none" for silence
   "target_user": "string", // The sender of the message being addressed
-  "reply_message": "string"
+  "reply_message": "string" // Leave EMPTY ("") if action is "none" or if no reply is actually needed (e.g. casual small talk).
 }
 
 ### RESPONSE INSTRUCTIONS:
 - Tone: Adjust severity based on USER PERFORMANCE STATS.
 - Consistency: Cite previous offenses naturally if applicable.
 - Brevity: Keep it human and concise.
+- Strict Silence: If the user is just making small talk or discussing the bot, DO NOT REPLY. Leave reply_message empty!
 `;
 
         return await this._callLLM(pass2SystemPrompt, transcript, pendingImages);
