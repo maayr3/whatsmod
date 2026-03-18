@@ -69,7 +69,7 @@ ${combinedRules}
 Return a STRICT JSON object in the exact format:
 {
   "violation": boolean,
-  "needs_reply": boolean, // Set to true IF: 1) An UNANSWERED @mention is in the newest messages, 2) Users explicitly ask for help, OR 3) You were recently engaged in the PRIOR CONTEXT and a user is clearly continuing that direct conversation with you in the newest messages. DO NOT set to true for casual banter among humans.
+  "needs_reply": boolean, // Set to true IF: 1) An UNANSWERED @mention is in the newest messages, 2) Users explicitly ask for help, OR 3) You were recently engaged in the PRIOR CONTEXT and a user is clearly continuing that direct conversation with you by replying to or following up on your last message. You MUST set this to true if they are talking to YOU. DO NOT set to true for casual human-to-human banter where you are not addressed.
   "reason": "string",
   "classification_analysis": "string" // ${justificationGuidance}
 }
@@ -120,7 +120,7 @@ Return a STRICT JSON object in the exact format:
 - Tone: Adjust severity based on USER PERFORMANCE STATS.
 - Consistency: Cite previous offenses naturally if applicable.
 - Brevity: Keep it human and concise.
-- Strict Silence: If the user is just making small talk or discussing the bot, DO NOT REPLY. Leave reply_message empty!
+- Strict Silence: Generally stay silent for human-to-human small talk or when users are just talking about you in the third person. However, if the user is directly talking to YOU or replying to your last message, you MUST reply. Do not leave reply_message empty if you are in an active conversation with the user.
 `;
 
         return await this._callLLM(pass2SystemPrompt, transcript, pendingImages);
