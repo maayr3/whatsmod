@@ -61,15 +61,15 @@ when triggered, the bot must:
 4. **Tony Stark** 🤖
 5. **Yoda** 🧠
 6. **Batman** 🦇
-7. **Forrest Gump** 🏃
-8. **Indiana Jones** 🏺
+7. **Dirty Harry** 🏃
+8. **Kevin McCallister** 🏺
 9. **Neo** 🕶️
 10. **Terminator** 🤖
 11. **The Dude** 🥤
 12. **John Wick** 🐶
 13. **Lara Croft** 🏹
 14. **Michael Corleone** 🖤
-15. **Ellen Ripley** 👽
+15. **Agent Smith** 👽
 16. **Marty McFly** ⏰
 17. **Gandalf** 🧙
 18. **Sherlock Holmes** 🕵️‍♂️
