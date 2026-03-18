@@ -33,7 +33,7 @@ class LLMService {
         // Find the index of the last moderation system marker
         let lastMarkerIndex = -1;
         for (let i = messages.length - 1; i >= 0; i--) {
-            if (messages[i].startsWith('[System]: Warned')) {
+            if (messages[i].startsWith('[System]: Warned') || messages[i].startsWith('[System]: Responded')) {
                 lastMarkerIndex = i;
                 break;
             }
@@ -69,7 +69,7 @@ ${combinedRules}
 Return a STRICT JSON object in the exact format:
 {
   "violation": boolean,
-  "needs_reply": boolean, // Set to true if an @mention (e.g. @bot or @1078...) is detected, OR if users explicitly ask for help. IF @MENTIONED, YOU MUST RESPOND (true) EVEN FOR SMALL TALK. Otherwise, do NOT set to true for casual banter among users.
+  "needs_reply": boolean, // Set to true if an UNANSWERED @mention (e.g. @bot or @1078...) or direct address is detected in the newest messages, OR if users explicitly ask for help. IF @MENTIONED, YOU MUST RESPOND (true) EVEN FOR SMALL TALK. Otherwise, do NOT set to true for casual banter.
   "reason": "string",
   "classification_analysis": "string" // ${justificationGuidance}
 }
