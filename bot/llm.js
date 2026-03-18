@@ -69,7 +69,7 @@ ${combinedRules}
 Return a STRICT JSON object in the exact format:
 {
   "violation": boolean,
-  "needs_reply": boolean, // Set to true ONLY if an @mention is detected OR users explicitly ask the moderator for help. Do NOT set to true for small talk or debugging. For everything else, this MUST BE FALSE unless evaluating a violation.
+  "needs_reply": boolean, // Set to true if an @mention (e.g. @bot or @1078...) is detected, OR if users explicitly ask for help. IF @MENTIONED, YOU MUST RESPOND (true) EVEN FOR SMALL TALK. Otherwise, do NOT set to true for casual banter among users.
   "reason": "string",
   "classification_analysis": "string" // ${justificationGuidance}
 }
