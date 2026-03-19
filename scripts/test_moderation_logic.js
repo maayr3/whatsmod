@@ -3,7 +3,7 @@ const LLMService = require('../bot/llm');
 
 async function test() {
     const llm = new LLMService();
-    const channelName = "WarRoom";
+    const channelName = "LifeRoom";
 
     const testCases = [
         {
