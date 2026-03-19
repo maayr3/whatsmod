@@ -52,6 +52,14 @@ class LLMService {
         }
         const transcript = lastMarkerIndex >= 0 ? `${priorContextStr}\n\n${evaluateStr}` : evaluateStr;
 
+        // Provide current AEST date to help with Daily Character Mode modulo logic
+        const nowAEST = new Date().toLocaleString("en-US", { timeZone: "Australia/Sydney" });
+        const dateObj = new Date(nowAEST);
+        const yyyy = dateObj.getFullYear();
+        const mm = String(dateObj.getMonth() + 1).padStart(2, '0');
+        const dd = String(dateObj.getDate()).padStart(2, '0');
+        const compactDate = `${yyyy}${mm}${dd}`;
+
         const debugLevel = parseInt(process.env.DEBUG_LEVEL || "0", 10);
         const justificationGuidance = debugLevel >= 1
             ? "Provide a detailed justification (2-5 sentences) for your decision."
@@ -61,6 +69,10 @@ class LLMService {
         const pass1SystemPrompt = `
 ${combinedRules}
 
+### CURRENT CONTEXT:
+- **Current Date (AEST):** ${compactDate}
+- **Channel:** ${channelName}
+
 ### MODERATION PRIORITY (NEUTRAL CLASSIFICATION):
 1. **CONTENT-FIRST EVALUATION:** You MUST judge each new message based ONLY on its intrinsic value. High-Value media (educational, tech/business news, tech reviews like CES updates, etc.) is STRICTLY PERMITTED.
 2. **UNCERTAINTY = SILENCE (MANDATORY):** If you cannot definitively verify that a link contains "Junk Media" (e.g. memes, unrelated comedy), you MUST return violation=false. Do NOT assume a link is junk just because it is from Instagram/TikTok and lacks a caption.
@@ -69,7 +81,8 @@ ${combinedRules}
 Return a STRICT JSON object in the exact format:
 {
   "violation": boolean,
-  "needs_reply": boolean, // Set to true IF: 1) An UNANSWERED @mention is in the newest messages, 2) Users explicitly ask for help, OR 3) You were recently engaged in the PRIOR CONTEXT and a user is clearly continuing that direct conversation with you by replying to or following up on your last message. You MUST set this to true if they are talking to YOU. DO NOT set to true for casual human-to-human banter where you are not addressed.
+  "needs_reply": boolean, // Set to true ONLY IF: 1) There is an explicit @mention of the bot in the newest messages, 2) A user asks a direct, clear question, OR 3) You were recently engaged in the PRIOR CONTEXT and a user is clearly continuing that direct conversation with you by replying to or following up on your last message. 
+  // IMPORTANT: Do NOT set to true for: 1) General "on-topic" discussion where you are NOT addressed, 2) Small talk where you aren't the focus, 3) Messages that look like system status updates or others using your voice unless they ask YOU something. Being "on-topic" is NOT a reason to interject.
   "reason": "string",
   "classification_analysis": "string" // ${justificationGuidance}
 }

@@ -34,6 +34,22 @@ async function test() {
                 "[John]: You're all just a bunch of idiots, can't wait to see you all fail lol."
             ],
             expectedViolation: true
+        },
+        {
+            name: "System Noise (No Reply Expected)",
+            messages: [
+                "[Matt Ayre]: (Doc Brown) - Great Scott! Glad to hear the timeline is back in order. Thanks for the save."
+            ],
+            expectedViolation: false,
+            expectedNeedsReply: false
+        },
+        {
+            name: "On-Topic Technical Update (No Reply Expected)",
+            messages: [
+                "[Matt Ayre]: Just updated the bot's logging configuration to use AEST timestamps."
+            ],
+            expectedViolation: false,
+            expectedNeedsReply: false
         }
     ];
 
@@ -43,9 +59,11 @@ async function test() {
         console.log(`Running Test: ${testCase.name}`);
         try {
             const result = await llm.evaluate(channelName, testCase.messages, [], {});
-            const success = result.violation === testCase.expectedViolation;
+            const success = result.violation === testCase.expectedViolation &&
+                (testCase.expectedNeedsReply === undefined || !!result.needs_reply === testCase.expectedNeedsReply);
             console.log(`Result: ${success ? 'PASSED' : 'FAILED'}`);
             console.log(`Violation: ${result.violation}`);
+            console.log(`Needs Reply: ${!!result.needs_reply}`);
             console.log(`Reason: ${result.reason}`);
             console.log(`Reply: ${result.reply_message || '(empty)'}`);
             console.log(`Analysis: ${result.classification_analysis}\n`);
