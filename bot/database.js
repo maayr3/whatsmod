@@ -23,21 +23,21 @@ class Database {
 
     migrate() {
         // Migration: If we find top-level keys that aren't '_system' and have 'offenses',
-        // move them into 'WarRoom' (the default group).
+        // move them into 'LifeRoom' (the default group).
         const keys = Object.keys(this.data);
         const legacyUsers = keys.filter(k => k !== '_system' && this.data[k].offenses);
 
         if (legacyUsers.length > 0) {
-            console.log(`[Database] Migrating ${legacyUsers.length} users to 'WarRoom' namespace...`);
-            if (!this.data['WarRoom']) {
-                this.data['WarRoom'] = { users: {} };
+            console.log(`[Database] Migrating ${legacyUsers.length} users to 'LifeRoom' namespace...`);
+            if (!this.data['LifeRoom']) {
+                this.data['LifeRoom'] = { users: {} };
             }
-            if (!this.data['WarRoom'].users) {
-                this.data['WarRoom'].users = {};
+            if (!this.data['LifeRoom'].users) {
+                this.data['LifeRoom'].users = {};
             }
 
             for (const user of legacyUsers) {
-                this.data['WarRoom'].users[user] = this.data[user];
+                this.data['LifeRoom'].users[user] = this.data[user];
                 delete this.data[user];
             }
             this.save();
