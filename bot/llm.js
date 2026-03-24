@@ -175,7 +175,7 @@ Return a STRICT JSON object in the exact format:
             userContent = `Transcript: \n${transcript} `;
         }
 
-        const fallbackCascade = ["google/gemini-3.1-flash-lite-preview"];
+        const fallbackCascade = ["google/gemini-3-flash-preview", "google/gemini-3.1-flash-lite-preview"];
 
         for (let i = 0; i < fallbackCascade.length; i++) {
             const currentModel = fallbackCascade[i];
