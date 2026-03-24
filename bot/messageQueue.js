@@ -76,6 +76,15 @@ class MessageQueue {
             }
 
             chatState.isEvaluating = true;
+
+            // Safety timeout: if evaluation takes > 90s, force-reset the lock
+            const safetyTimeout = setTimeout(() => {
+                if (chatState.isEvaluating) {
+                    console.error(`[Queue] SAFETY TRIGGERED: Evaluation for ${chatId} timed out after 90s. Resetting lock.`);
+                    chatState.isEvaluating = false;
+                }
+            }, 90000);
+
             try {
                 // Capture current snapshot
                 const transcript = [...chatState.messages];
@@ -85,6 +94,7 @@ class MessageQueue {
             } catch (err) {
                 console.error(`[Queue] Error in evaluation callback for ${chatId}:`, err);
             } finally {
+                clearTimeout(safetyTimeout);
                 chatState.isEvaluating = false;
             }
         };

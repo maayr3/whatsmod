@@ -46,6 +46,9 @@ class TranscriptionService {
                 ]
             };
 
+            const controller = new AbortController();
+            const timeoutId = setTimeout(() => controller.abort(), 60000); // 60s timeout
+
             const response = await fetch(this.baseURL, {
                 method: "POST",
                 headers: {
@@ -54,8 +57,9 @@ class TranscriptionService {
                     "HTTP-Referer": "https://github.com/maayr3/whatsmod", // Good practice for OpenRouter
                     "X-Title": "WhatsMod Bot"
                 },
-                body: JSON.stringify(payload)
-            });
+                body: JSON.stringify(payload),
+                signal: controller.signal
+            }).finally(() => clearTimeout(timeoutId));
 
             if (!response.ok) {
                 const errorData = await response.json().catch(() => ({}));
