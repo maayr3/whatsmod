@@ -173,7 +173,20 @@ client.on('message_create', async (message) => {
 // Hourly heartbeat to logs
 setInterval(() => {
     systemLogger.log(`Heartbeat: WhatsMod v${version} (${hash}) is active. Memory usage: ${Math.round(process.memoryUsage().heapUsed / 1024 / 1024)}MB`);
-}, 60 * 60 * 1000);
+}, 15 * 60 * 1000);
+
+// Proper shutdown handling
+process.on('SIGTERM', async () => {
+    systemLogger.log('SIGTERM received. Shutting down...');
+    try {
+        await client.destroy();
+        systemLogger.log('Client destroyed successfully.');
+        process.exit(0);
+    } catch (err) {
+        systemLogger.error('Error during shutdown:', err);
+        process.exit(1);
+    }
+});
 
 systemLogger.log(`Starting WhatsMod v${version} (${hash})...`);
 systemLogger.log('Initializing WhatsApp Client...');

@@ -16,3 +16,10 @@ bash scripts/auto_commit_push.sh "feat: add user login"
 1. Complete the coding task.
 2. Verify the changes.
 3. Run the auto-commit script with a conventional commit message.
+
+## VM Information (Production)
+- **Hostname:** `edgewonk_cli`
+- **Mapping:** This is configured in the local `/etc/hosts` file.
+- **Remote Path:** `/home/ubuntu/whatsmod`
+- **Service Name:** `whatsmod.service`
+- **Check Status:** `ssh ubuntu@edgewonk_cli "systemctl status whatsmod"`

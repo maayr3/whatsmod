@@ -9,6 +9,7 @@ WorkingDirectory=/home/ubuntu/whatsmod
 ExecStart=/usr/bin/node index.js
 Restart=on-failure
 RestartSec=30
+TimeoutStopSec=30
 MemoryMax=950M
 MemoryHigh=850M
 

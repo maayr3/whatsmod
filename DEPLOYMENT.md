@@ -22,9 +22,13 @@ All configuration and secrets are managed via the `.env` file.
 
 To avoid re-scanning the QR code on the server and to transfer your secrets, use the `scripts/push_state.sh` script.
 
+### VM Information
+- **Hostname:** `edgewonk_cli`
+- **Configuration:** This hostname is mapped to the VM's IP address in your local `/etc/hosts` file.
+
 ### Usage
 ```bash
-./scripts/push_state.sh <vm_host> [vm_user] [vm_path]
+./scripts/push_state.sh edgewonk_cli [vm_user] [vm_path]
 ```
 
 **Example:**
