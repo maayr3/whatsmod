@@ -2,6 +2,14 @@ const { OpenAI } = require('openai');
 const fs = require('fs');
 const path = require('path');
 
+const CHARACTER_POOL = [
+    "Jack Sparrow", "Darth Vader", "The Joker", "Tony Stark", "Yoda",
+    "Batman", "Dirty Harry", "Kevin McCallister", "Neo", "Terminator",
+    "The Dude", "John Wick", "Lara Croft", "Michael Corleone", "Agent Smith",
+    "Marty McFly", "Gandalf", "Sherlock Holmes", "Morpheus", "Tony Montana",
+    "Doc Brown"
+];
+
 class LLMService {
     constructor() {
         this.openai = new OpenAI({
@@ -53,12 +61,17 @@ class LLMService {
         const transcript = lastMarkerIndex >= 0 ? `${priorContextStr}\n\n${evaluateStr}` : evaluateStr;
 
         // Provide current AEST date to help with Daily Character Mode modulo logic
-        const nowAEST = new Date().toLocaleString("en-US", { timeZone: "Australia/Sydney" });
-        const dateObj = new Date(nowAEST);
+        const nowAESTString = new Date().toLocaleString("en-US", { timeZone: "Australia/Sydney" });
+        const dateObj = new Date(nowAESTString);
         const yyyy = dateObj.getFullYear();
         const mm = String(dateObj.getMonth() + 1).padStart(2, '0');
         const dd = String(dateObj.getDate()).padStart(2, '0');
         const compactDate = `${yyyy}${mm}${dd}`;
+
+        // Calculate daily character
+        const dateNum = parseInt(compactDate, 10);
+        const characterIndex = dateNum % CHARACTER_POOL.length;
+        const selectedCharacter = CHARACTER_POOL[characterIndex];
 
         const debugLevel = parseInt(process.env.DEBUG_LEVEL || "0", 10);
         const justificationGuidance = debugLevel >= 1
@@ -72,6 +85,7 @@ ${combinedRules}
 ### CURRENT CONTEXT:
 - **Current Date (AEST):** ${compactDate}
 - **Channel:** ${channelName}
+- **Assigned Daily Character:** ${selectedCharacter}
 
 ### MODERATION PRIORITY (NEUTRAL CLASSIFICATION):
 1. **CONTENT-FIRST EVALUATION:** You MUST judge each new message based ONLY on its intrinsic value. High-Value media (educational, tech/business news, tech reviews like CES updates, etc.) is STRICTLY PERMITTED.
@@ -116,6 +130,15 @@ ${combinedRules}
 USER PERFORMANCE STATS:
 ${statsContext || "No offenses logged for any user."}
 
+### CURRENT CONTEXT:
+- **Current Date (AEST):** ${compactDate}
+- **Assigned Daily Character:** ${selectedCharacter}
+
+### CHARACTER INSTRUCTIONS:
+- **Daily Character Mode:** For today, you are **${selectedCharacter}**.
+- **Requirement:** You MUST prefix every response with \`(${selectedCharacter}) - \`.
+- **Persona:** Fully adopt the tone, vocabulary, idioms, and iconic style of ${selectedCharacter}.
+
 The previous evaluation yielded the following context/reason: "${pass1Result.reason}".
 Your task is to craft a human-like response and set the appropriate action.
 
@@ -130,7 +153,7 @@ Return a STRICT JSON object in the exact format:
 }
 
 ### RESPONSE INSTRUCTIONS:
-- Tone: Adjust severity based on USER PERFORMANCE STATS.
+- Tone: Adjust severity based on USER PERFORMANCE STATS and your persona.
 - Consistency: Cite previous offenses naturally if applicable.
 - Brevity: Keep it human and concise.
 - Strict Silence: Generally stay silent for human-to-human small talk or when users are just talking about you in the third person. However, if the user is directly talking to YOU or replying to your last message, you MUST reply. Do not leave reply_message empty if you are in an active conversation with the user.
