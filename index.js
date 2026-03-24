@@ -178,12 +178,23 @@ setInterval(() => {
 // Proper shutdown handling
 process.on('SIGTERM', async () => {
     systemLogger.log('SIGTERM received. Shutting down...');
+    
+    // Set a force-exit timeout in case client.destroy() hangs
+    const forceExitTimeout = setTimeout(() => {
+        systemLogger.warn('Shutdown timed out, forcing exit.');
+        process.exit(1);
+    }, 10000);
+
     try {
-        await client.destroy();
-        systemLogger.log('Client destroyed successfully.');
+        if (client) {
+            await client.destroy();
+            systemLogger.log('Client destroyed successfully.');
+        }
+        clearTimeout(forceExitTimeout);
         process.exit(0);
     } catch (err) {
         systemLogger.error('Error during shutdown:', err);
+        clearTimeout(forceExitTimeout);
         process.exit(1);
     }
 });
