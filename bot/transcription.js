@@ -3,7 +3,7 @@ class TranscriptionService {
         this.apiKey = process.env.OPENROUTER_API_KEY;
         this.baseURL = "https://openrouter.ai/api/v1/chat/completions";
         // Use the same model identifier that the main LLM service uses.
-        this.model = "google/gemini-3-flash-preview";
+        this.model = "google/gemini-3.1-flash-lite-preview";
     }
 
     /**
