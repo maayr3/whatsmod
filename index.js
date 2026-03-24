@@ -58,23 +58,49 @@ const moderator = new Moderator(db, messageQueue);
 const client = new Client({
     authStrategy: new LocalAuth(),
     puppeteer: {
-        args: ['--no-sandbox', '--disable-setuid-sandbox'],
+        headless: 'shell',
+        pipe: true,
+        protocolTimeout: 1200000, // 20 minutes
         executablePath: process.env.CHROME_PATH || undefined,
+        args: [
+            '--no-sandbox',
+            '--disable-setuid-sandbox',
+            '--disable-dev-shm-usage',
+            '--disable-accelerated-2d-canvas',
+            '--no-first-run',
+            '--no-zygote',
+            '--disable-gpu',
+            '--disable-extensions',
+            '--disable-default-apps',
+            '--enable-logging=stderr',
+            '--v=1',
+            '--disable-gpu-shader-disk-cache',
+            '--disk-cache-size=1',
+            '--media-cache-size=1',
+        ],
     }
 });
 
+// Capture browser console logs
+client.on('remote_session_saved', () => {
+    systemLogger.log('Remote session saved.');
+});
+
 client.on('qr', (qr) => {
-    systemLogger.log('Generating QR code...');
+    systemLogger.log('QR Code received! The session has expired or is invalid.');
     qrcode.generate(qr, { small: true });
-    systemLogger.log('Please scan the QR Code with your WhatsApp app.');
+});
+
+client.on('loading_screen', (percent, message) => {
+    systemLogger.log(`WhatsApp Loading: ${percent}% - ${message}`);
 });
 
 client.on('authenticated', () => {
-    systemLogger.log('WhatsApp Bot authenticated successfully!');
+    systemLogger.log('WhatsApp Client Authenticated successfully!');
 });
 
 client.on('auth_failure', (msg) => {
-    systemLogger.error('WhatsApp Bot authentication failure:', msg);
+    systemLogger.error('WhatsApp Client Authentication FAILURE:', msg);
 });
 
 client.on('ready', async () => {
