@@ -1,5 +1,6 @@
 const LLMService = require('./llm');
 const TranscriptionService = require('./transcription');
+const YouTubeService = require('./youtube');
 
 const VIDEO_SIZE_LIMIT_BYTES = 10 * 1024 * 1024; // 10 MB
 
@@ -15,6 +16,32 @@ class Moderator {
         const log = logger || require('./logger').system;
         let text = message.body || "";
         let imageData = null; // { mimeType, base64 } for new images to send to LLM
+
+        // YouTube handling: Detect links and fetch metadata/thumbnail
+        const videoId = YouTubeService.extractVideoId(text);
+        if (videoId) {
+            log.log(`[YouTube] Detected video ID: ${videoId}`);
+            const metadata = await YouTubeService.getMetadata(text);
+            if (metadata) {
+                const metaStr = `[YouTube Content: "${metadata.title}" by ${metadata.author}]`;
+                text = text ? `${text} ${metaStr}` : metaStr;
+                log.log(`[YouTube] Fetched metadata: ${metaStr}`);
+            }
+            
+            // Fetch thumbnail for visual context (thumbnail acts as the "nailclip" or "opening frame")
+            const thumbnail = await YouTubeService.getThumbnailBase64(videoId);
+            if (thumbnail) {
+                imageData = thumbnail;
+                log.log(`[YouTube] Fetched thumbnail for visual analysis.`);
+            }
+
+            // Fetch transcript for deeper content analysis
+            const transcript = await YouTubeService.getTranscript(videoId);
+            if (transcript) {
+                text = `${text} [YouTube Transcript: "${transcript}"]`;
+                log.log(`[YouTube] Fetched transcript (${transcript.length} chars).`);
+            }
+        }
 
         // Handle media messages
         if (message.hasMedia) {

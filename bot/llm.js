@@ -96,15 +96,18 @@ ${combinedRules}
 Return a STRICT JSON object in the exact format:
 {
   "violation": boolean,
-  "needs_reply": boolean, // Set to true ONLY IF: 1) There is an explicit @mention of the bot in the newest messages, 2) A user asks a direct, clear question, OR 3) You were recently engaged in the PRIOR CONTEXT and a user is clearly continuing that direct conversation with you by replying to or following up on your last message. 
-  // IMPORTANT: Do NOT set to true for: 1) General "on-topic" discussion where you are NOT addressed, 2) Small talk where you aren't the focus, 3) Messages that look like system status updates or others using your voice unless they ask YOU something. Being "on-topic" is NOT a reason to interject.
+  "needs_reply": boolean, // Set to true ONLY IF: 1) There is an explicit @mention of the bot (e.g., @bot, @AI_Moderator) in the newest messages, 2) A user asks a direct, clear question addressed TO YOU, OR 3) You were recently engaged in the PRIOR CONTEXT and a user is clearly continuing that direct conversation with you by replying to or following up on your last message. 
+  // IMPORTANT: Do NOT set to true for: 1) General "on-topic" discussion where you are NOT addressed (e.g. people talking about tech/AI among themselves), 2) Small talk where you aren't the focus, 3) Messages that look like system status updates or others using your voice unless they ask YOU something. Being "on-topic" is NEVER a reason to interject. If a user is talking to someone else (e.g. "btw @Matt..."), you MUST stay silent.
   "reason": "string",
-  "classification_analysis": "string" // ${justificationGuidance}
+  "classification_analysis": "string" // Provide a brief internal justification (exactly 1 sentence) for your decision on violation and needs_reply. Do NOT put your reply message here.
 }
 
 ### ANALYSIS INSTRUCTIONS:
+- **Mention Check:** Check if the message contains "@AI_Moderator" or "@bot" or a clear nickname for you.
+- **Direct Address:** Is the user talking TO you or ABOUT you to someone else? Only reply if they are talking TO you.
+- **Silence Precedence:** If you are even 1% unsure if you should reply, you MUST stay silent (needs_reply: false).
 - URL Assessment: Assess content type based on URL or creator (e.g. devdoesreviews is High-Value). 
-- **Silence Precedence:** If you are even 1% unsure if a link is high-value or junk, you MUST stay silent (violation: false).
+- **Silence Precedence (Moderation):** If you are even 1% unsure if a link is high-value or junk, you MUST stay silent (violation: false).
 `;
 
         const pass1Result = await this._callLLM(pass1SystemPrompt, transcript, pendingImages);
