@@ -21,11 +21,11 @@ ssh "$VM_USER@$VM_HOST" "mkdir -p $VM_PATH"
 
 
 # Sync the auth folder
-if [ -d ".wwebjs_auth" ]; then
+if [ -d ".wwebjs_auth" ] && [ "$(ls -A .wwebjs_auth)" ]; then
     echo "Syncing .wwebjs_auth..."
     rsync -avz --progress --exclude='SingletonLock' --exclude='SingletonSocket' --exclude='SingletonCookie' .wwebjs_auth/ "$VM_USER@$VM_HOST:$VM_PATH/.wwebjs_auth/"
 else
-    echo "Warning: .wwebjs_auth not found. Have you scanned the QR code locally?"
+    echo "Warning: .wwebjs_auth not found or empty. Skipping session push to avoid bricking remote."
 fi
 
 # Sync the cache folder
