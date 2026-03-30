@@ -2,13 +2,6 @@ const { OpenAI } = require('openai');
 const fs = require('fs');
 const path = require('path');
 
-const CHARACTER_POOL = [
-    "Jack Sparrow", "Darth Vader", "The Joker", "Tony Stark", "Yoda",
-    "Batman", "Dirty Harry", "Kevin McCallister", "Neo", "Terminator",
-    "The Dude", "John Wick", "Lara Croft", "Michael Corleone", "Agent Smith",
-    "Marty McFly", "Gandalf", "Sherlock Holmes", "Morpheus", "Tony Montana",
-    "Doc Brown"
-];
 
 class LLMService {
     constructor() {
@@ -61,7 +54,7 @@ class LLMService {
         }
         const transcript = lastMarkerIndex >= 0 ? `${priorContextStr}\n\n${evaluateStr}` : evaluateStr;
 
-        // Provide current AEST date to help with Daily Character Mode modulo logic
+        // Provide current AEST date
         const nowAESTString = new Date().toLocaleString("en-US", { timeZone: "Australia/Sydney" });
         const dateObj = new Date(nowAESTString);
         const yyyy = dateObj.getFullYear();
@@ -69,10 +62,20 @@ class LLMService {
         const dd = String(dateObj.getDate()).padStart(2, '0');
         const compactDate = `${yyyy}${mm}${dd}`;
 
-        // Calculate daily character
-        const dateNum = parseInt(compactDate, 10);
-        const characterIndex = dateNum % CHARACTER_POOL.length;
-        const selectedCharacter = CHARACTER_POOL[characterIndex];
+        // Daily Character Mode (AEST) - Only active for WarRoom and DEBUG
+        let selectedCharacter = null;
+        if (['WarRoom', 'DEBUG'].includes(channelName)) {
+            const CHARACTER_POOL = [
+                "Jack Sparrow", "Darth Vader", "The Joker", "Tony Stark", "Yoda",
+                "Batman", "Dirty Harry", "Kevin McCallister", "Neo", "Terminator",
+                "The Dude", "John Wick", "Lara Croft", "Michael Corleone", "Agent Smith",
+                "Marty McFly", "Gandalf", "Sherlock Holmes", "Morpheus", "Tony Montana",
+                "Doc Brown"
+            ];
+            const dateNum = parseInt(compactDate, 10);
+            const characterIndex = dateNum % CHARACTER_POOL.length;
+            selectedCharacter = CHARACTER_POOL[characterIndex];
+        }
 
         const debugLevel = parseInt(process.env.DEBUG_LEVEL || "0", 10);
         const justificationGuidance = debugLevel >= 1
@@ -86,7 +89,7 @@ ${combinedRules}
 ### CURRENT CONTEXT:
 - **Current Date (AEST):** ${compactDate}
 - **Channel:** ${channelName}
-- **Assigned Daily Character:** ${selectedCharacter}
+${selectedCharacter ? `- **Assigned Daily Character:** ${selectedCharacter}` : ""}
 
 ### MODERATION PRIORITY (NEUTRAL CLASSIFICATION):
 1. **CONTENT-FIRST EVALUATION:** You MUST judge each new message based ONLY on its intrinsic value. High-Value media (educational, tech/business news, tech reviews like CES updates, etc.) is STRICTLY PERMITTED.
@@ -136,12 +139,12 @@ ${statsContext || "No offenses logged for any user."}
 
 ### CURRENT CONTEXT:
 - **Current Date (AEST):** ${compactDate}
-- **Assigned Daily Character:** ${selectedCharacter}
-
+${selectedCharacter ? `
 ### CHARACTER INSTRUCTIONS:
 - **Daily Character Mode:** For today, you are **${selectedCharacter}**.
 - **Requirement:** You MUST prefix every response with \`(${selectedCharacter}) - \`.
 - **Persona:** Fully adopt the tone, vocabulary, idioms, and iconic style of ${selectedCharacter}.
+` : ""}
 
 The previous evaluation yielded the following context/reason: "${pass1Result.reason}".
 Your task is to craft a human-like response and set the appropriate action.
