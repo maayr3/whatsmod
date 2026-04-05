@@ -22,3 +22,4 @@ The **Daily Character Mode** is exclusive to these two channels. The logic is im
 ## 🚀 Deployment & Integrity
 - **ALWAYS commit, push, and deploy** when a feature or fix is completed and the user gives the "go ahead".
 - Use the `/complete-feature` and `/deploy` workflows to maintain the remote VM's state.
+- **Post-Deploy Monitoring**: After every deployment, wait for **3 minutes** to observe the logs. Ensure the bot has posted a message in the `DEBUG` channel saying it is back online. If this message does not appear, immediately begin diagnosing the failure.
