@@ -226,7 +226,7 @@ class Moderator {
                 } catch (e) {
                     log.error("Failed to send warning message:", e);
                 }
-            } else if (result && !result.violation && result.reply_message) {
+            } else if (result && !result.violation && result.action === 'reply' && result.reply_message) {
                 // Value-add response or polite redirection without strike
                 try {
                     const fullReply = `${result.reply_message}`;

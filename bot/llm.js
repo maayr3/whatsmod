@@ -99,16 +99,27 @@ ${selectedCharacter ? `- **Assigned Daily Character:** ${selectedCharacter}` : "
 Return a STRICT JSON object in the exact format:
 {
   "violation": boolean,
-  "needs_reply": boolean, // Set to true ONLY IF: 1) There is an explicit @mention of the bot (e.g., @bot, @AI_Moderator) in the newest messages, 2) A user asks a direct, clear question addressed TO YOU, OR 3) You were recently engaged in the PRIOR CONTEXT and a user is clearly continuing that direct conversation with you by replying to or following up on your last message. 
-  // IMPORTANT: Do NOT set to true for: 1) General "on-topic" discussion where you are NOT addressed (e.g. people talking about tech/AI among themselves), 2) Small talk where you aren't the focus, 3) Messages that look like system status updates or others using your voice unless they ask YOU something. Being "on-topic" is NEVER a reason to interject. If a user is talking to someone else (e.g. "btw @Matt..."), you MUST stay silent.
+  "needs_reply": boolean, // DEFAULT: false. Set to true ONLY IF one of these EXACT conditions is met:
+  // 1) The message contains a LITERAL @mention of the bot (e.g., "@bot", "@AI_Moderator", "@whatsmod").
+  // 2) A user NAMES YOU specifically and asks YOU a question (e.g., "hey bot, what do you think?").
+  // 3) A user REPLIES TO your previous message (indicated by "(Replying to AI_Moderator: ...)" prefix) AND asks a follow-up question.
+  // 
+  // HARD RULES - needs_reply MUST be false for ALL of these:
+  // - General group questions (e.g., "any recommends on X?", "what do you guys think?", "has anyone tried Y?") — these are addressed to OTHER HUMANS, not you.
+  // - On-topic discussion between humans, even if you know the answer.
+  // - Small talk, banter, or casual conversation.
+  // - Messages about you in the third person (e.g., "the bot is cool").
+  // - Rhetorical questions or questions directed at another named user.
+  // - System status updates or bot signatures.
+  // YOU ARE NOT A PARTICIPANT IN CONVERSATIONS. You are a SILENT MODERATOR. You do NOT answer questions, give recommendations, or join discussions unless EXPLICITLY named/mentioned.
   "reason": "string",
   "classification_analysis": "string" // Provide a brief internal justification (exactly 1 sentence) for your decision on violation and needs_reply. Do NOT put your reply message here.
 }
 
 ### ANALYSIS INSTRUCTIONS:
-- **Mention Check:** Check if the message contains "@AI_Moderator" or "@bot" or a clear nickname for you.
-- **Direct Address:** Is the user talking TO you or ABOUT you to someone else? Only reply if they are talking TO you.
-- **Silence Precedence:** If you are even 1% unsure if you should reply, you MUST stay silent (needs_reply: false).
+- **Mention Check:** Check if the message contains a LITERAL "@AI_Moderator" or "@bot" or "@whatsmod" string. General questions to the group do NOT count.
+- **Direct Address:** Is the user talking TO you BY NAME, or just asking the group? If there is ANY ambiguity, the answer is NO.
+- **Silence Precedence:** If you are even 1% unsure if you should reply, you MUST stay silent (needs_reply: false). When in doubt, ALWAYS return false.
 - URL Assessment: Assess content type based on URL or creator (e.g. devdoesreviews is High-Value). 
 - **Silence Precedence (Moderation):** If you are even 1% unsure if a link is high-value or junk, you MUST stay silent (violation: false).
 `;
@@ -154,16 +165,17 @@ Return a STRICT JSON object in the exact format:
   "violation": boolean, // Use the value from Pass 1
   "reason": "${pass1Result.reason || "none"}",
   "classification_analysis": "${pass1Result.classification_analysis}",
-  "action": "string", // "strike" for violations, "reply" for Q&A, "none" for silence
+  "action": "string", // "strike" for violations, "reply" ONLY if the user explicitly @mentioned or named the bot, "none" for ALL other cases
   "target_user": "string", // The sender of the message being addressed
-  "reply_message": "string" // Leave EMPTY ("") if action is "none" or if no reply is actually needed (e.g. casual small talk).
+  "reply_message": "string" // MUST be "" (empty string) if action is "none". Only populate if action is "strike" or "reply".
 }
 
 ### RESPONSE INSTRUCTIONS:
+- **DEFAULT ACTION IS "none":** Unless there is a clear violation (action: "strike") or the user EXPLICITLY addressed the bot by name/mention (action: "reply"), the action MUST be "none" and reply_message MUST be empty.
 - Tone: Adjust severity based on USER PERFORMANCE STATS and your persona.
 - Consistency: Cite previous offenses naturally if applicable.
 - Brevity: Keep it human and concise.
-- Strict Silence: Generally stay silent for human-to-human small talk or when users are just talking about you in the third person. However, if the user is directly talking to YOU or replying to your last message, you MUST reply. Do not leave reply_message empty if you are in an active conversation with the user.
+- **Strict Silence:** Do NOT reply to general group questions, recommendations requests, or casual conversation. You are a MODERATOR, not a participant. Only reply if the user literally used your name or @mention.
 `;
 
         return await this._callLLM(pass2SystemPrompt, transcript, pendingImages);
