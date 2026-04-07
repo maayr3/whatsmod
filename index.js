@@ -54,6 +54,7 @@ db.init();
 // Initialize the queue and the moderator subsystem
 const messageQueue = new MessageQueue();
 const moderator = new Moderator(db, messageQueue);
+let botWid = null; // Bot's own WhatsApp ID, set on 'ready'
 
 const client = new Client({
     authStrategy: new LocalAuth(),
@@ -106,6 +107,13 @@ client.on('auth_failure', (msg) => {
 client.on('ready', async () => {
     systemLogger.log('WhatsApp Bot Client is ready and connected!');
 
+    // Capture the bot's own WhatsApp ID for mention detection
+    try {
+        botWid = client.info.wid._serialized;
+        systemLogger.log(`Bot WhatsApp ID: ${botWid}`);
+    } catch (e) {
+        systemLogger.warn('Could not determine bot WhatsApp ID:', e.message);
+    }
     // Log all groups the bot is in
     try {
         const chats = await client.getChats();
@@ -162,7 +170,7 @@ client.on('message_create', async (message) => {
 
             const channelLogger = new logger.ChannelLogger(chat.name);
             channelLogger.log(`[Group Match] Received message from ${message.author || message.from}: "${message.body}"`);
-            await moderator.handleMessage(message, chat, channelLogger);
+            await moderator.handleMessage(message, chat, channelLogger, botWid);
         }
     } catch (err) {
         systemLogger.error('Error handling message:', err);

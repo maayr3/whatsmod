@@ -12,7 +12,7 @@ class Moderator {
         this.transcription = new TranscriptionService();
     }
 
-    async handleMessage(message, chat, logger) {
+    async handleMessage(message, chat, logger, botId) {
         const log = logger || require('./logger').system;
         let text = message.body || "";
         let imageData = null; // { mimeType, base64 } for new images to send to LLM
@@ -104,6 +104,36 @@ class Moderator {
             }
         }
 
+        // --- HARD GATE: Check if bot was ACTUALLY @mentioned ---
+        // message.mentionedIds contains the WhatsApp IDs of users @mentioned in this message.
+        // Only if the bot's own ID is in that list do we allow needs_reply=true.
+        // Extract numeric portion for comparison (handles @lid, @c.us, bare number variants)
+        const botIdNumber = botId ? botId.replace(/@.*$/, '') : null;
+        const isBotMentioned = botIdNumber && Array.isArray(message.mentionedIds) &&
+            message.mentionedIds.some(id => {
+                const mentionNumber = id.replace(/@.*$/, '');
+                return mentionNumber === botIdNumber;
+            });
+
+        // Resolve @mentions in message text to human-readable names
+        // WhatsApp sends @mentions as @LID_NUMBER in the body text
+        if (message.mentionedIds && message.mentionedIds.length > 0) {
+            try {
+                const mentions = await message.getMentions();
+                for (const mentionedContact of mentions) {
+                    const mentionName = mentionedContact.pushname || mentionedContact.number || 'Unknown';
+                    const lid = mentionedContact.id._serialized;
+                    // Replace raw @LID patterns with @HumanName
+                    // WhatsApp body may contain the LID with or without @lid suffix
+                    const lidNumber = lid.replace('@lid', '').replace('@c.us', '');
+                    text = text.replace(new RegExp(`@${lidNumber}\\b`, 'g'), `@${mentionName}`);
+                    text = text.replace(new RegExp(`@${lid}`, 'g'), `@${mentionName}`);
+                }
+            } catch (e) {
+                log.warn(`[Moderator] Failed to resolve mentions: ${e.message}`);
+            }
+        }
+
         // Handle quoted messages to provide context to the LLM
         if (message.hasQuotedMsg) {
             try {
@@ -154,7 +184,7 @@ class Moderator {
                 (pendingImages.length ? ` (with ${pendingImages.length} new image(s))` : ''));
 
             const userStats = this.db.getAllUserStats(chat.name, 30);
-            const result = await this.llm.evaluate(chat.name, transcript, pendingImages, userStats);
+            const result = await this.llm.evaluate(chat.name, transcript, pendingImages, userStats, isBotMentioned);
 
             if (result && result.error === 'QUOTA_EXHAUSTED') {
                 // Gemini API resets at midnight Pacific Time

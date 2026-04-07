@@ -15,7 +15,7 @@ class LLMService {
     /**
      * Evaluate a transcript of recent messages using a two-pass approach to eliminate bias.
      */
-    async evaluate(channelName, messages, pendingImages = [], userStats = {}) {
+    async evaluate(channelName, messages, pendingImages = [], userStats = {}, isBotMentioned = false) {
         let channelRules = "";
         let globalRules = "";
         try {
@@ -125,6 +125,21 @@ Return a STRICT JSON object in the exact format:
 `;
 
         const pass1Result = await this._callLLM(pass1SystemPrompt, transcript, pendingImages);
+
+        // --- HARD GATE: Override LLM's needs_reply if bot was NOT actually @mentioned ---
+        // The LLM cannot reliably distinguish @mentions of the bot from @mentions of other users
+        // when raw LID numbers appear in the transcript. This code-level gate is the authoritative check.
+        if (pass1Result && pass1Result.needs_reply && !isBotMentioned) {
+            // Also check for textual name-based addressing (e.g. "hey bot", "@whatsmod")
+            const lastMsg = messages[messages.length - 1] || '';
+            const botNamePatterns = /\b(bot|whatsmod|ai.?mod|moderator)\b/i;
+            const hasTextualMention = botNamePatterns.test(lastMsg);
+
+            if (!hasTextualMention) {
+                console.log(`[LLM HARD GATE] Overriding needs_reply=true -> false. Bot was NOT @mentioned and no textual name match. LLM reason: "${pass1Result.classification_analysis || pass1Result.reason}"`);
+                pass1Result.needs_reply = false;
+            }
+        }
 
         if (!pass1Result || (!pass1Result.violation && !pass1Result.needs_reply)) {
             return {
